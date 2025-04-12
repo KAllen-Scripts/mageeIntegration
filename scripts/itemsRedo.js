@@ -5,75 +5,152 @@ const fastcsv = require('fast-csv');
 const { countries } = require('countries-list');
 
 // File paths
-const itemsFilePath = path.resolve(__dirname, '../files/items/data.json');
-const imagesFilePath = path.resolve(__dirname, '../files/items/images.json');
-const protexFilePath = path.resolve(__dirname, '../files/items/Product_SKU_20241216154235.csv');
-const protexProductFilePath = path.resolve(__dirname, '../files/items/Product_20241216154235.csv');
-const fmFilePath = path.resolve(__dirname, '../files/items/241003_Total FM stock information.csv');
-const siteProductsFilePath = path.resolve(__dirname, '../files/items/Products.csv');
-const attributeNamesFilePath = path.resolve(__dirname, '../files/items/Attribute Names.csv');
-const attributeValuesFilePath = path.resolve(__dirname, '../files/items/Attribute Values.csv');
-const stockAttributesFilePath = path.resolve(__dirname, '../files/items/Stock Attributes.csv');
-const modelImagesFilePath = path.resolve(__dirname, '../files/items/IRP-Data-active-models-with-image-urls.csv');
-const FMSupplierLookupCSV = path.resolve(__dirname, '../files/items/FM-supplier-code-lookup.csv');
+const itemsFilePath = path.resolve(__dirname, '../files - new/data.json');
+const imagesFilePath = path.resolve(__dirname, '../files - new/images.json');
+const protexSKUFolder = path.resolve(__dirname, '../files - new/Product SKU');
+const protexProductFolderPath = path.resolve(__dirname, '../files - new/product');
+const fmFolderPath = path.resolve(__dirname, '../files - new/FM');
+const siteProductsFilePath = path.resolve(__dirname, '../files - new/website/Models_11042025104320.csv');
+const attributeNamesFilePath = path.resolve(__dirname, '../files - new/website/Attribute Names.csv');
+const attributeValuesFilePath = path.resolve(__dirname, '../files - new/website/Attribute Values.csv');
+const stockAttributesFilePath = path.resolve(__dirname, '../files - new/website/Stock Attributes.csv');
+const modelImagesFilePath = path.resolve(__dirname, '../files - new/website/IRP-img-urls-all-time.csv');
+const FMSupplierLookupCSV = path.resolve(__dirname, '../files - new/FM-supplier-code-lookup.csv');
 
-// Attribute ID mappings for each data source
+
+
+//mageeTest mappings
+///////////////////////////////////////////////////////////////////////////////////
+// const childMappables = {
+//     FM: {
+//         "ColourDesc\n(Ref 6)": '011c5db3-8b84-4226-b03b-f76879b958bd',
+//         'Brand': '4538ee27-dc3e-4861-a850-c99423d3bc9d',
+//         "Season\n(Ref 1)": '3d3328fd-f5be-44dc-a599-e7d049d5bace',
+//         Department: '869803bc-95fd-4bfb-ac22-429fe69c4358',
+//         // "Fabric\n(Ref 2)": '48c313ae-38f0-482e-90d4-97d7758b840b' //tbd
+//     },
+//     Protex: {
+//         'product search 1 description': '869803bc-95fd-4bfb-ac22-429fe69c4358',
+//         'product colour season/year': '3d3328fd-f5be-44dc-a599-e7d049d5bace',
+//         'Season/Year': 'c373a567-1f82-42dc-868e-43feb51951bf',
+//         'product search 2 description': '358a2ea2-84d6-437f-8d58-756401a6304b',
+//         'product colour search 1 description': 'ba769c13-3d8b-4478-9b10-6d12d28b4830'
+//     },
+//     siteAttributes: {
+//         "Colour": '011c5db3-8b84-4226-b03b-f76879b958bd'
+//     },
+//     siteData: {
+//         models_model: '7a78578d-26bd-4942-a506-a327abef94e4',
+//         Models_AdditionalInformation1: 'e5ca508c-fd0e-4f18-b067-c3c32586de3a',
+//         Models_AdditionalInformation2: 'f9c6722a-e781-4eb3-8c97-9be6d00934c5'
+//     }
+// };
+
+// const parentMappables = {
+//     FM: {
+//         'retail price (inc vat)': '42263a17-a049-4c01-b60d-9a7c19d529c3',
+//         'uk wholesale (gbp) (exc vat) (user 3)': '7706e970-907e-402d-aa3d-163649f913ad',
+//         'eu wholesale (eur) (exc vat) (user 2)': 'edd061e8-6ca1-487e-85cb-5e00b0a5aebb',
+//         "ColourDesc\n(Ref 6)": '011c5db3-8b84-4226-b03b-f76879b958bd',
+//         Colour: '3d72fded-8126-4a5c-b3d2-2d3ac8496c9c',
+//         'Brand': '4538ee27-dc3e-4861-a850-c99423d3bc9d',
+//         "Season\n(Ref 1)": '3d3328fd-f5be-44dc-a599-e7d049d5bace',
+//         Department: '869803bc-95fd-4bfb-ac22-429fe69c4358',
+//     },
+//     Protex: {
+//         'product search 1 description': '869803bc-95fd-4bfb-ac22-429fe69c4358',
+//         'product colour season/year': '3d3328fd-f5be-44dc-a599-e7d049d5bace',
+//         'Season/Year': 'c373a567-1f82-42dc-868e-43feb51951bf',
+//         'product search 2 description': '358a2ea2-84d6-437f-8d58-756401a6304b',
+//         'product colour search 1 description': 'ba769c13-3d8b-4478-9b10-6d12d28b4830',
+//         'Product Colour Code': '3d72fded-8126-4a5c-b3d2-2d3ac8496c9c'
+//     },
+//     siteAttributes: {
+//         'pattern': 'd7684a3c-01db-4f28-9947-c125cadb1ce3',
+//         'material': '0f4c88c6-1983-4ee2-937b-777c1670b51f',
+//         'style': '32226684-a871-47a2-a61c-55df3a202121',
+//         "Colour": '011c5db3-8b84-4226-b03b-f76879b958bd'
+//     },
+//     siteData: {
+//         models_model: '7a78578d-26bd-4942-a506-a327abef94e4',
+//         Models_AdditionalInformation1: 'e5ca508c-fd0e-4f18-b067-c3c32586de3a',
+//         Models_AdditionalInformation2: 'f9c6722a-e781-4eb3-8c97-9be6d00934c5'
+//     }
+// };
+// const parentProductAttribute = '259defac-d04b-4fa3-b97f-d57390a06169';
+// const sizeAttribute = '0f0eb2bc-16c8-4d0c-bd05-1a81e75ae77a';
+// const fitAttribute = '2fa2ad26-1a5b-49e1-84bd-a4e8b7d6b99c';
+///////////////////////////////////////////////////////////////////////////////////
+
+
+
+
+
+
+//mageeStaging mappings
+///////////////////////////////////////////////////////////////////////////////////
 const childMappables = {
     FM: {
-        "ColourDesc\n(Ref 6)": '011c5db3-8b84-4226-b03b-f76879b958bd',
-        'Brand': '4538ee27-dc3e-4861-a850-c99423d3bc9d',
-        "Season\n(Ref 1)": '3d3328fd-f5be-44dc-a599-e7d049d5bace',
-        Department: '869803bc-95fd-4bfb-ac22-429fe69c4358',
+        "ColourDesc\n(Ref 6)": '4c85f491-3de5-4114-af6d-c1ab7b870251',
+        'Brand': '3d9fd37a-60e5-4e4c-8c02-dc961b67de98',
+        "Season\n(Ref 1)": '13c4c99e-3565-4b4e-b3b0-25f6314f3955',
+        Department: '41b3e9fa-c636-41dc-b70c-deadddff6a40',
         // "Fabric\n(Ref 2)": '48c313ae-38f0-482e-90d4-97d7758b840b' //tbd
     },
     Protex: {
-        'product search 1 description': '869803bc-95fd-4bfb-ac22-429fe69c4358',
-        'product colour season/year': '3d3328fd-f5be-44dc-a599-e7d049d5bace',
-        'Season/Year': 'c373a567-1f82-42dc-868e-43feb51951bf',
-        'product search 2 description': '358a2ea2-84d6-437f-8d58-756401a6304b',
-        'product colour search 1 description': 'ba769c13-3d8b-4478-9b10-6d12d28b4830'
+        'product search 1 description': '41b3e9fa-c636-41dc-b70c-deadddff6a40',
+        'product colour season/year': '13c4c99e-3565-4b4e-b3b0-25f6314f3955',
+        'Season/Year': '6ce894e8-8b34-4f3f-9f44-7d56f6cbb1e5',
+        'product search 2 description': '6b3daf6e-926d-4fb6-b548-2001ad352638',
+        'product colour search 1 description': 'c4ae0e48-15b6-48c6-8bc0-a8f797be7aef'
     },
     siteAttributes: {
-        "Colour": '011c5db3-8b84-4226-b03b-f76879b958bd'
+        "Colour": '4c85f491-3de5-4114-af6d-c1ab7b870251'
     },
     siteData: {
-        models_model: '7a78578d-26bd-4942-a506-a327abef94e4',
-        Models_AdditionalInformation1: 'e5ca508c-fd0e-4f18-b067-c3c32586de3a',
-        Models_AdditionalInformation2: 'f9c6722a-e781-4eb3-8c97-9be6d00934c5'
+        models_model: 'e575c574-cb5b-46f2-810f-58dfd8effaf0',
+        Models_AdditionalInformation1: '44585f6e-f8bc-419b-b193-f55ea0d1be9c',
+        Models_AdditionalInformation2: 'ba13a327-6706-4919-b4ab-7f9b35c518bc'
     }
 };
 
 const parentMappables = {
     FM: {
-        'retail price (inc vat)': '42263a17-a049-4c01-b60d-9a7c19d529c3',
-        'uk wholesale (gbp) (exc vat) (user 3)': '7706e970-907e-402d-aa3d-163649f913ad',
-        'eu wholesale (eur) (exc vat) (user 2)': 'edd061e8-6ca1-487e-85cb-5e00b0a5aebb',
-        "ColourDesc\n(Ref 6)": '011c5db3-8b84-4226-b03b-f76879b958bd',
-        Colour: '3d72fded-8126-4a5c-b3d2-2d3ac8496c9c',
-        'Brand': '4538ee27-dc3e-4861-a850-c99423d3bc9d',
-        "Season\n(Ref 1)": '3d3328fd-f5be-44dc-a599-e7d049d5bace',
-        Department: '869803bc-95fd-4bfb-ac22-429fe69c4358',
+        'retail price (inc vat)': 'a0602adc-4ab7-47b4-bb31-7ad3cba62814',
+        'uk wholesale (gbp) (exc vat) (user 3)': '09f44d56-55a3-460b-ab83-37ff57005259',
+        'eu wholesale (eur) (exc vat) (user 2)': 'dca6bffd-9a25-4686-b85c-b57e0a8a93f8',
+        "ColourDesc\n(Ref 6)": '4c85f491-3de5-4114-af6d-c1ab7b870251',
+        Colour: '9301312c-f71e-4216-a204-484f8e8f2d40',
+        'Brand': '3d9fd37a-60e5-4e4c-8c02-dc961b67de98',
+        "Season\n(Ref 1)": '13c4c99e-3565-4b4e-b3b0-25f6314f3955',
+        Department: '41b3e9fa-c636-41dc-b70c-deadddff6a40',
     },
     Protex: {
-        'product search 1 description': '869803bc-95fd-4bfb-ac22-429fe69c4358',
-        'product colour season/year': '3d3328fd-f5be-44dc-a599-e7d049d5bace',
-        'Season/Year': 'c373a567-1f82-42dc-868e-43feb51951bf',
-        'product search 2 description': '358a2ea2-84d6-437f-8d58-756401a6304b',
-        'product colour search 1 description': 'ba769c13-3d8b-4478-9b10-6d12d28b4830',
-        'Product Colour Code': '3d72fded-8126-4a5c-b3d2-2d3ac8496c9c'
+        'product search 1 description': '41b3e9fa-c636-41dc-b70c-deadddff6a40',
+        'product colour season/year': '13c4c99e-3565-4b4e-b3b0-25f6314f3955',
+        'Season/Year': '6ce894e8-8b34-4f3f-9f44-7d56f6cbb1e5',
+        'product search 2 description': '6b3daf6e-926d-4fb6-b548-2001ad352638',
+        'product colour search 1 description': 'c4ae0e48-15b6-48c6-8bc0-a8f797be7aef',
+        'Product Colour Code': '9301312c-f71e-4216-a204-484f8e8f2d40'
     },
     siteAttributes: {
-        'pattern': 'd7684a3c-01db-4f28-9947-c125cadb1ce3',
-        'material': '0f4c88c6-1983-4ee2-937b-777c1670b51f',
-        'style': '32226684-a871-47a2-a61c-55df3a202121',
-        "Colour": '011c5db3-8b84-4226-b03b-f76879b958bd'
+        'pattern': '483f4af9-3e1d-4ceb-a82e-43710372ff3b',
+        'material': 'fc020182-7081-40e7-bae2-22ed017d58fd',
+        'style': '956c3d4d-8eac-4584-875c-b821e53af407',
+        "Colour": '4c85f491-3de5-4114-af6d-c1ab7b870251'
     },
     siteData: {
-        models_model: '7a78578d-26bd-4942-a506-a327abef94e4',
-        Models_AdditionalInformation1: 'e5ca508c-fd0e-4f18-b067-c3c32586de3a',
-        Models_AdditionalInformation2: 'f9c6722a-e781-4eb3-8c97-9be6d00934c5'
+        models_model: 'e575c574-cb5b-46f2-810f-58dfd8effaf0',
+        Models_AdditionalInformation1: '44585f6e-f8bc-419b-b193-f55ea0d1be9c',
+        Models_AdditionalInformation2: 'ba13a327-6706-4919-b4ab-7f9b35c518bc'
     }
 };
+
+const parentProductAttribute = '427c1dcb-9f3c-4acc-be4e-03dc3e7a8dc5';
+const sizeAttribute = '588ede69-9afa-4632-970d-d51b612eb5d5';
+const fitAttribute = 'aa261ded-5d0c-429f-99cd-bc5e2fd5d841';
+///////////////////////////////////////////////////////////////////////////////////
+
 
 // Global variables
 let itemList = {};
@@ -86,6 +163,7 @@ let attributeAllowedValues = {};
 let itemTypes = {};
 let FMSupplierLookup = {};
 let suppliers = {};
+let supplierTempLookup = {};
 
 const fitLookup = {
     R: "Regular",
@@ -183,14 +261,15 @@ async function getItems() {
 }
 
 async function getItemTypes(){
-    await common.loopThrough('Getting Attributes', `https://${global.enviroment}/v0/item-types`, 'size=1000', '[status]!={1}', (type)=>{
+    await common.loopThrough('Getting Types', `https://${global.enviroment}/v0/item-types`, 'size=1000', '[status]!={1}', (type)=>{
         itemTypes[type.name.toLowerCase().trim()] = type.itemTypeId
     })
 };
 
 async function getSuppliers(){
-    await common.loopThrough('Getting Attributes', `https://${global.enviroment}/v1/suppliers`, 'size=1000', '[status]!={1}', (supp)=>{
+    await common.loopThrough('Getting Suppliers', `https://${global.enviroment}/v1/suppliers`, 'size=1000', '[status]!={1}', (supp)=>{
         suppliers[supp.accountReference.toLowerCase().trim()] = supp.supplierId
+        supplierTempLookup[supp.name.toLowerCase().trim()] = supp.accountReference
     })
 };
 
@@ -200,271 +279,315 @@ async function getAttributes(){
     })
 };
 
+
 // Process Protex SKU CSV
 async function processProtexCSV() {
-    return new Promise((resolve, reject) => {
-        const stream = fs.createReadStream(protexFilePath)
-            .pipe(fastcsv.parse({ headers: true, trim: true }))
-            .on('error', error => {
-                console.error('Error parsing CSV:', error);
-                reject(error);
-            })
-            .on('data', async row => {
-                stream.pause();
-                
-                const productCode = `${row['Product']}_${row['Colour Code']}`.trim();
-                const sku = row['SKU'].trim();
-                const fitName = row['Fit Name'] ? row['Fit Name'].trim() : '';
-                const sizeName = row['Size Name'] ? row['Size Name'].toString().trim() : '';
-                const productName = row['Product Name'] ? row['Product Name'].trim() : '';
-                const ean = row['EAN'] ? row['EAN'].toString().trim() : '';
-                
-                // Initialize product if needed
-                if (!productData[productCode]) {
-                    productData[productCode] = {
-                        name: productName,
-                        attributes: {
-                            Protex: row
-                        },
-                        variants: {},
-                        singleItemSKU: row['Product']
-                    };
-                } else if (!productData[productCode].attributes.Protex) {
-                    // Ensure Protex attribute exists if the product already exists
-                    productData[productCode].attributes.Protex = row;
-                }
-                
-                productData[productCode].attributes.Protex = row;
-
-                // Create the properly formatted variant key (ProductCode_ColorCode-SizeFit)
-                const formattedVariantKey = `${row['Product']}_${row['Colour Code']}-${row['Size'] || ''}${row['Fit'] ? row['Fit'].charAt(0) : ''}`;
-                
-                // Use the formatted variant key as the primary key
-                if (!productData[productCode].variants[formattedVariantKey]) {
-                    productData[productCode].variants[formattedVariantKey] = {
-                        name: `${productName}_${row['Colour Code']}-${sizeName}${fitName ? fitName.charAt(0) : ''}`,
-                        barcodes: [],
-                        attributes: {},
-                        altCodes: [],
-                        sizeValue: row['Size'],
-                        fitValue: fitLookup[row['Fit']]
-                    };
-                }
-
-                productData[productCode].variants[formattedVariantKey].attributes.Protex = row;
-                
-                // Add data
-                if (ean) productData[productCode].variants[formattedVariantKey].barcodes.push(ean);
-                if (sku && sku !== formattedVariantKey) productData[productCode].variants[formattedVariantKey].altCodes.push(sku);
-                
-                // Add alt SKU format (with hyphen)
-                const altSku = `${row['Product']}-${row['Colour Code']}-${row['Fit'] || ''}-${row['Size'] || ''}`.replace(/--+/g, '-').replace(/-$/,'');
-                if (altSku && altSku !== formattedVariantKey && !productData[productCode].variants[formattedVariantKey].altCodes.includes(altSku)) {
-                    productData[productCode].variants[formattedVariantKey].altCodes.push(altSku);
-                }
-                
-                // Add dash-separated version of the formatted variant key as an alt code
-                const dashVariantKey = `${row['Product']}-${row['Colour Code']}-${row['Size'] || ''}${row['Fit'] ? row['Fit'].charAt(0) : ''}`;
-                if (dashVariantKey && dashVariantKey !== formattedVariantKey && !productData[productCode].variants[formattedVariantKey].altCodes.includes(dashVariantKey)) {
-                    productData[productCode].variants[formattedVariantKey].altCodes.push(dashVariantKey);
-                }
-                
-                // Add the SKU from Protex as protexSKU
-                if (sku) {
-                    productData[productCode].variants[formattedVariantKey].protexSKU = sku;
-                }
-                
-                stream.resume();
-            })
-            .on('end', () => {
-                console.log(`Processed ${Object.keys(productData).length} products`);
-                resolve();
-            });
-    });
-}
-
-// Process FM CSV
-async function processFmCSV() {
-    return new Promise((resolve, reject) => {
-        const stream = fs.createReadStream(fmFilePath)
-            .pipe(fastcsv.parse({ 
-                headers: true, 
-                trim: true,
-                // Handle carriage returns and other whitespace in headers
-                transformHeader: (header) => {
-                    return header.replace(/\r\n|\n|\r/g, ' ').trim();
-                }
-            }))
-            .on('error', error => {
-                console.error('Error parsing FM CSV:', error);
-                reject(error);
-            })
-            .on('data', row => {
-                stream.pause();
-                
-                // Map FM fields to Protex fields
-                const product = row['SPC'] ? row['SPC'].trim() : '';
-                const colorCode = row['Colour'] ? row['Colour'].trim() : '';
-                const size = row['Size'] ? row['Size'].trim() : '';
-                const description = row['Description'] ? row['Description'].trim() : '';
-                
-                // Skip if essential data is missing
-                if (!product || !colorCode) {
-                    stream.resume();
-                    return;
-                }
-                
-                const productCode = `${product}_${colorCode}`;
-                
-                // Create or update product
-                if (!productData[productCode]) {
-                    productData[productCode] = {
-                        name: description || product,
-                        attributes: {
-                            Protex: {}
-                        },
-                        variants: {},
-                        singleItemSKU: product
-                    };
-                } else if (!productData[productCode].attributes.Protex) {
-                    // Ensure Protex attribute exists if the product already exists
-                    productData[productCode].attributes.Protex = {};
-                }
-                
-                // Try to determine fit and size from the combined size field
-                let sizeName = size;
-                let fitChar = '';
-                
-                // Check if the size ends with a letter that might indicate fit (S, R, L)
-                const sizeMatch = size.match(/^(\d+)([SRL])$/i);
-                if (sizeMatch) {
-                    sizeName = sizeMatch[1];
-                    fitChar = sizeMatch[2].toUpperCase();
-                }
-                
-                // Create variant key
-                const formattedVariantKey = `${product}_${colorCode}-${sizeName}${fitChar}`;
-                
-                // Create or update variant
-                if (!productData[productCode].variants[formattedVariantKey]) {
-                    productData[productCode].variants[formattedVariantKey] = {
-                        name: `${description || product}_${colorCode}-${size}`,
-                        barcodes: [],
-                        attributes: {},
-                        altCodes: []
-                    };
-                }
-
-                productData[productCode].variants[formattedVariantKey].attributes.FM = row;
-                productData[productCode].attributes.FM = row;
-
-                if (productData[productCode].variants[formattedVariantKey].fitValue === undefined) {
-                    productData[productCode].variants[formattedVariantKey].fitValue = fitLookup[row['Length\n(Ref 13)'].trim()]
-                }
-                
-                // Only set the sizeValue if it's not already defined
-                if (productData[productCode].variants[formattedVariantKey].sizeValue === undefined) {
-                    let sizeValue = row['Size'] ? row['Size'].trim() : '';
+    // Get all CSV files in the folder
+    const files = await fs.promises.readdir(protexSKUFolder);
+    const csvFiles = files.filter(file => file.toLowerCase().endsWith('.csv'));
+    
+    console.log(`Found ${csvFiles.length} CSV files in ${protexSKUFolder}`);
+    
+    // Process each CSV file sequentially
+    for (const csvFile of csvFiles) {
+        const protexFilePath = path.join(protexSKUFolder, csvFile);
+        console.log(`Processing ${csvFile}...`);
+        
+        await new Promise((resolve, reject) => {
+            const stream = fs.createReadStream(protexFilePath)
+                .pipe(fastcsv.parse({ headers: true, trim: true }))
+                .on('error', error => {
+                    console.error('Error parsing CSV:', error);
+                    reject(error);
+                })
+                .on('data', async row => {
+                    stream.pause();
                     
-                    // If the Length (Ref 13) field exists, remove it from the end of the size
-                    if (row['Length\n(Ref 13)'] && sizeValue.endsWith(row['Length\n(Ref 13)'])) {
-                        sizeValue = sizeValue.substring(0, sizeValue.length - row['Length\n(Ref 13)'].length).trim();
+                    const productCode = `${row['Product']}_${row['Colour Code']}`.trim();
+                    const sku = row['SKU'].trim();
+                    const fitName = row['Fit Name'] ? row['Fit Name'].trim() : '';
+                    const sizeName = row['Size Name'] ? row['Size Name'].toString().trim() : '';
+                    const productName = row['Product Name'] ? row['Product Name'].trim() : '';
+                    const ean = row['EAN'] ? row['EAN'].toString().trim() : '';
+                    
+                    // Initialize product if needed
+                    if (!productData[productCode]) {
+                        productData[productCode] = {
+                            name: productName,
+                            attributes: {
+                                Protex: row
+                            },
+                            variants: {},
+                            singleItemSKU: row['Product']
+                        };
+                    } else if (!productData[productCode].attributes.Protex) {
+                        // Ensure Protex attribute exists if the product already exists
+                        productData[productCode].attributes.Protex = row;
                     }
                     
-                    // Set the processed size value on the variant
-                    productData[productCode].variants[formattedVariantKey].sizeValue = sizeValue;
-                }
-                
-                // Add barcodes
-                const systemBarcode = row['System Barcode'] ? row['System Barcode'].toString().trim() : '';
-                const gtin1 = row['GTIN Barcode (H1)'] ? row['GTIN Barcode (H1)'].toString().trim() : '';
-                const gtin2 = row['GTIN Barcode (1)'] ? row['GTIN Barcode (1)'].toString().trim() : '';
-                
-                if (systemBarcode && !productData[productCode].variants[formattedVariantKey].barcodes.includes(systemBarcode)) {
-                    productData[productCode].variants[formattedVariantKey].barcodes.push(systemBarcode);
-                }
-                
-                if (gtin1 && !isNaN(gtin1) && !productData[productCode].variants[formattedVariantKey].barcodes.includes(gtin1)) {
-                    productData[productCode].variants[formattedVariantKey].barcodes.push(gtin1);
-                }
-                
-                if (gtin2 && !isNaN(gtin2) && !productData[productCode].variants[formattedVariantKey].barcodes.includes(gtin2)) {
-                    productData[productCode].variants[formattedVariantKey].barcodes.push(gtin2);
-                }
-                
-                // Add alternate SKU codes
-                const dashVariantKey = `${product}-${colorCode}-${sizeName}${fitChar}`;
-                if (dashVariantKey && !productData[productCode].variants[formattedVariantKey].altCodes.includes(dashVariantKey)) {
-                    productData[productCode].variants[formattedVariantKey].altCodes.push(dashVariantKey);
-                }
-                
-                stream.resume();
-            })
-            .on('end', () => {
-                console.log(`Processed FM CSV data`);
-                resolve();
-            });
-    });
+                    productData[productCode].attributes.Protex = row;
+
+                    // Create the properly formatted variant key (ProductCode_ColorCode-SizeFit)
+                    const formattedVariantKey = `${row['Product']}_${row['Colour Code']}-${row['Size'] || ''}${row['Fit'] ? row['Fit'].charAt(0) : ''}`;
+                    
+                    // Use the formatted variant key as the primary key
+                    if (!productData[productCode].variants[formattedVariantKey]) {
+                        productData[productCode].variants[formattedVariantKey] = {
+                            name: `${productName}_${row['Colour Code']}-${sizeName}${fitName ? fitName.charAt(0) : ''}`,
+                            barcodes: [],
+                            attributes: {},
+                            altCodes: [],
+                            sizeValue: row['Size'],
+                            fitValue: fitLookup[row['Fit']]
+                        };
+                    }
+
+                    productData[productCode].variants[formattedVariantKey].attributes.Protex = row;
+                    
+                    // Add data
+                    if (ean) productData[productCode].variants[formattedVariantKey].barcodes.push(ean);
+                    if (sku && sku !== formattedVariantKey) productData[productCode].variants[formattedVariantKey].altCodes.push(sku);
+                    
+                    // Add alt SKU format (with hyphen)
+                    const altSku = `${row['Product']}-${row['Colour Code']}-${row['Fit'] || ''}-${row['Size'] || ''}`.replace(/--+/g, '-').replace(/-$/,'');
+                    if (altSku && altSku !== formattedVariantKey && !productData[productCode].variants[formattedVariantKey].altCodes.includes(altSku)) {
+                        productData[productCode].variants[formattedVariantKey].altCodes.push(altSku);
+                    }
+                    
+                    // Add dash-separated version of the formatted variant key as an alt code
+                    const dashVariantKey = `${row['Product']}-${row['Colour Code']}-${row['Size'] || ''}${row['Fit'] ? row['Fit'].charAt(0) : ''}`;
+                    if (dashVariantKey && dashVariantKey !== formattedVariantKey && !productData[productCode].variants[formattedVariantKey].altCodes.includes(dashVariantKey)) {
+                        productData[productCode].variants[formattedVariantKey].altCodes.push(dashVariantKey);
+                    }
+                    
+                    // Add the SKU from Protex as protexSKU
+                    if (sku) {
+                        productData[productCode].variants[formattedVariantKey].protexSKU = sku;
+                    }
+                    
+                    stream.resume();
+                })
+                .on('end', () => {
+                    console.log(`Finished processing ${csvFile}`);
+                    resolve();
+                });
+        });
+    }
+    
+    console.log(`Processed all CSV files. Total products: ${Object.keys(productData).length}`);
 }
 
-// Process Protex Product CSV
-async function processProtexProductCSV() {
-    return new Promise((resolve, reject) => {
-        const stream = fs.createReadStream(protexProductFilePath)
-            .pipe(fastcsv.parse({ headers: true, trim: true }))
-            .on('error', error => {
-                console.error('Error parsing Protex Product CSV:', error);
-                reject(error);
-            })
-            .on('data', row => {
-                stream.pause();
-                
-                const productCode = row['Product Code'] ? row['Product Code'].trim() : '';
-                const productColorCode = row['Product Colour Code'] ? row['Product Colour Code'].trim() : '';
-                
-                // Skip if essential data is missing
-                if (!productCode || !productColorCode) {
-                    stream.resume();
-                    return;
-                }
-                
-                const combinedProductCode = `${productCode}_${productColorCode}`;
-                
-                // Check if the product already exists in our data
-                if (productData[combinedProductCode]) {
-                    // Create a 'Protex' object for the product attributes
-                    productData[combinedProductCode].attributes['Protex'] = {};
+// Process FM CSV files from a folder
+async function processFmCSV() {
+    // Get all CSV files in the folder
+    const files = await fs.promises.readdir(fmFolderPath);
+    const csvFiles = files.filter(file => file.toLowerCase().endsWith('.csv'));
+    
+    console.log(`Found ${csvFiles.length} FM CSV files in ${fmFolderPath}`);
+    
+    // Process each CSV file sequentially
+    for (const csvFile of csvFiles) {
+        const fmFilePath = path.join(fmFolderPath, csvFile);
+        console.log(`Processing FM CSV: ${csvFile}...`);
+        
+        await new Promise((resolve, reject) => {
+            const stream = fs.createReadStream(fmFilePath)
+                .pipe(fastcsv.parse({ 
+                    headers: true, 
+                    trim: true,
+                    // Handle carriage returns and other whitespace in headers
+                    transformHeader: (header) => {
+                        return header.replace(/\r\n|\n|\r/g, ' ').trim();
+                    }
+                }))
+                .on('error', error => {
+                    console.error(`Error parsing FM CSV ${csvFile}:`, error);
+                    reject(error);
+                })
+                .on('data', async row => {
+                    stream.pause();
                     
-                    // Add all fields from the Protex product row to the product attributes
-                    Object.keys(row).forEach(key => {
-                        if (row[key] !== undefined && row[key] !== null && row[key] !== '') {
-                            productData[combinedProductCode].attributes['Protex'][key] = row[key].toString().trim();
-                        }
-                    });
+                    // Map FM fields to Protex fields
+                    const product = row['SPC'] ? row['SPC'].trim() : '';
+                    const colorCode = row['Colour'] ? row['Colour'].trim() : '';
+                    const size = row['Size'] ? row['Size'].trim() : '';
+                    const description = row['Description'] ? row['Description'].trim() : '';
                     
-                    // Also add the Protex data to all variants of this product
-                    Object.keys(productData[combinedProductCode].variants).forEach(variantKey => {
-                        // Initialize Protex object for variant if it doesn't exist
-                        if (!productData[combinedProductCode].variants[variantKey].attributes['Protex']) {
-                            productData[combinedProductCode].variants[variantKey].attributes['Protex'] = {};
+                    // Skip if essential data is missing
+                    if (!product || !colorCode) {
+                        stream.resume();
+                        return;
+                    }
+                    
+                    const productCode = `${product}_${colorCode}`;
+                    
+                    // Create or update product
+                    if (!productData[productCode]) {
+                        productData[productCode] = {
+                            name: description || product,
+                            attributes: {
+                                Protex: {}
+                            },
+                            variants: {},
+                            singleItemSKU: product
+                        };
+                    } else if (!productData[productCode].attributes.Protex) {
+                        // Ensure Protex attribute exists if the product already exists
+                        productData[productCode].attributes.Protex = {};
+                    }
+                    
+                    // Try to determine fit and size from the combined size field
+                    let sizeName = size;
+                    let fitChar = '';
+                    
+                    // Check if the size ends with a letter that might indicate fit (S, R, L)
+                    const sizeMatch = size.match(/^(\d+)([SRL])$/i);
+                    if (sizeMatch) {
+                        sizeName = sizeMatch[1];
+                        fitChar = sizeMatch[2].toUpperCase();
+                    }
+                    
+                    // Create variant key
+                    const formattedVariantKey = `${product}_${colorCode}-${sizeName}${fitChar}`;
+                    
+                    // Create or update variant
+                    if (!productData[productCode].variants[formattedVariantKey]) {
+                        productData[productCode].variants[formattedVariantKey] = {
+                            name: `${description || product}_${colorCode}-${size}`,
+                            barcodes: [],
+                            attributes: {},
+                            altCodes: []
+                        };
+                    }
+
+                    productData[productCode].variants[formattedVariantKey].attributes.FM = row;
+                    productData[productCode].attributes.FM = row;
+
+                    if (productData[productCode].variants[formattedVariantKey].fitValue === undefined) {
+                        productData[productCode].variants[formattedVariantKey].fitValue = fitLookup[row['Length (Ref 13)']?.trim()]
+                    }
+                    
+                    // Only set the sizeValue if it's not already defined
+                    if (productData[productCode].variants[formattedVariantKey].sizeValue === undefined) {
+                        let sizeValue = row['Size'] ? row['Size'].trim() : '';
+                        
+                        // If the Length (Ref 13) field exists, remove it from the end of the size
+                        const lengthField = row['Length (Ref 13)'] || row['Length\n(Ref 13)'];
+                        if (lengthField && sizeValue.endsWith(lengthField)) {
+                            sizeValue = sizeValue.substring(0, sizeValue.length - lengthField.length).trim();
                         }
                         
-                        // Add product data to variant
+                        // Set the processed size value on the variant
+                        productData[productCode].variants[formattedVariantKey].sizeValue = sizeValue;
+                    }
+                    
+                    // Add barcodes
+                    const systemBarcode = row['System Barcode'] ? row['System Barcode'].toString().trim() : '';
+                    const gtin1 = row['GTIN Barcode (H1)'] ? row['GTIN Barcode (H1)'].toString().trim() : '';
+                    const gtin2 = row['GTIN Barcode (1)'] ? row['GTIN Barcode (1)'].toString().trim() : '';
+                    
+                    if (systemBarcode && !productData[productCode].variants[formattedVariantKey].barcodes.includes(systemBarcode)) {
+                        productData[productCode].variants[formattedVariantKey].barcodes.push(systemBarcode);
+                    }
+                    
+                    if (gtin1 && !isNaN(gtin1) && !productData[productCode].variants[formattedVariantKey].barcodes.includes(gtin1)) {
+                        productData[productCode].variants[formattedVariantKey].barcodes.push(gtin1);
+                    }
+                    
+                    if (gtin2 && !isNaN(gtin2) && !productData[productCode].variants[formattedVariantKey].barcodes.includes(gtin2)) {
+                        productData[productCode].variants[formattedVariantKey].barcodes.push(gtin2);
+                    }
+                    
+                    // Add alternate SKU codes
+                    const dashVariantKey = `${product}-${colorCode}-${sizeName}${fitChar}`;
+                    if (dashVariantKey && !productData[productCode].variants[formattedVariantKey].altCodes.includes(dashVariantKey)) {
+                        productData[productCode].variants[formattedVariantKey].altCodes.push(dashVariantKey);
+                    }
+                    
+                    stream.resume();
+                })
+                .on('end', () => {
+                    console.log(`Finished processing ${csvFile}`);
+                    resolve();
+                });
+        });
+    }
+    
+    console.log(`Processed all FM CSV files`);
+}
+
+// Process Protex Product CSV files from a folder
+async function processProtexProductCSV() {
+    // Get all CSV files in the folder
+    const files = await fs.promises.readdir(protexProductFolderPath);
+    const csvFiles = files.filter(file => file.toLowerCase().endsWith('.csv'));
+    
+    console.log(`Found ${csvFiles.length} Protex Product CSV files in ${protexProductFolderPath}`);
+    
+    // Process each CSV file sequentially
+    for (const csvFile of csvFiles) {
+        const protexProductFilePath = path.join(protexProductFolderPath, csvFile);
+        console.log(`Processing Protex Product CSV: ${csvFile}...`);
+        
+        await new Promise((resolve, reject) => {
+            const stream = fs.createReadStream(protexProductFilePath)
+                .pipe(fastcsv.parse({ headers: true, trim: true }))
+                .on('error', error => {
+                    console.error(`Error parsing Protex Product CSV ${csvFile}:`, error);
+                    reject(error);
+                })
+                .on('data', row => {
+                    stream.pause();
+                    
+                    const productCode = row['Product Code'] ? row['Product Code'].trim() : '';
+                    const productColorCode = row['Product Colour Code'] ? row['Product Colour Code'].trim() : '';
+                    
+                    // Skip if essential data is missing
+                    if (!productCode || !productColorCode) {
+                        stream.resume();
+                        return;
+                    }
+                    
+                    const combinedProductCode = `${productCode}_${productColorCode}`;
+                    
+                    // Check if the product already exists in our data
+                    if (productData[combinedProductCode]) {
+                        // Create a 'Protex' object for the product attributes
+                        productData[combinedProductCode].attributes['Protex'] = {};
+                        
+                        // Add all fields from the Protex product row to the product attributes
                         Object.keys(row).forEach(key => {
                             if (row[key] !== undefined && row[key] !== null && row[key] !== '') {
-                                productData[combinedProductCode].variants[variantKey].attributes['Protex'][key] = row[key].toString().trim();
+                                productData[combinedProductCode].attributes['Protex'][key] = row[key].toString().trim();
                             }
                         });
-                    });
-                }
-                
-                stream.resume();
-            })
-            .on('end', () => {
-                console.log(`Processed Protex Product CSV data`);
-                resolve();
-            });
-    });
+                        
+                        // Also add the Protex data to all variants of this product
+                        Object.keys(productData[combinedProductCode].variants).forEach(variantKey => {
+                            // Initialize Protex object for variant if it doesn't exist
+                            if (!productData[combinedProductCode].variants[variantKey].attributes['Protex']) {
+                                productData[combinedProductCode].variants[variantKey].attributes['Protex'] = {};
+                            }
+                            
+                            // Add product data to variant
+                            Object.keys(row).forEach(key => {
+                                if (row[key] !== undefined && row[key] !== null && row[key] !== '') {
+                                    productData[combinedProductCode].variants[variantKey].attributes['Protex'][key] = row[key].toString().trim();
+                                }
+                            });
+                        });
+                    }
+                    
+                    stream.resume();
+                })
+                .on('end', () => {
+                    console.log(`Finished processing ${csvFile}`);
+                    resolve();
+                });
+        });
+    }
+    
+    console.log(`Processed all Protex Product CSV files`);
 }
 
 // Process Site Products CSV
@@ -684,6 +807,8 @@ async function processImagesCSV() {
         
         console.log(`Built model lookup with ${Object.keys(stockIDLookup).length} unique model IDs`);
         
+        let promiseArr = []
+
         const stream = fs.createReadStream(modelImagesFilePath)
             .pipe(fastcsv.parse({ headers: true, trim: true }))
             .on('error', error => {
@@ -692,30 +817,38 @@ async function processImagesCSV() {
             })
             .on('data', async row => {
                 stream.pause();
-                totalCount++;
+
+                promiseArr.push((async ()=>{
+                    totalCount++;
                 
-                // Make sure we're accessing the ModelID field correctly
-                const modelId = row['Models_ModelID'];
-                
-                if (modelId && stockIDLookup[modelId] && row['ImageURLs']) {
-                    const parent = stockIDLookup[modelId];
-                    const imageUrls = row['ImageURLs'].split(',');
+                    // Make sure we're accessing the ModelID field correctly
+                    const modelId = row['Models_ModelID'];
                     
-                    // Process each image URL for this model
-                    for (const imageUrl of imageUrls) {
-                        if (!imageList[imageUrl]){
-                            let newURL = await common.postImage(imageUrl).then(r=>{return r.data.location})
-                            imageList[imageUrl] - newURL
+                    if (modelId && stockIDLookup[modelId] && row['ImageURLs']) {
+                        const parent = stockIDLookup[modelId];
+                        const imageUrls = row['ImageURLs'].split(',');
+                        
+                        // Process each image URL for this model
+                        for (const imageUrl of imageUrls) {
+                            if (!imageList[imageUrl]){
+                                let newURL = await common.postImage(imageUrl).then(r=>{return r.data.location})
+                                imageList[imageUrl] - newURL
+                            }
+                            if(!productData[parent].images.includes(imageList[imageUrl])){productData[parent].images.push(imageList[imageUrl])}
                         }
-                        if(!productData[parent].images.includes(imageList[imageUrl])){productData[parent].images.push(imageList[imageUrl])}
                     }
+                })())
+
+                if (promiseArr.length > 5){
+                    await Promise.all(promiseArr)
+                    promiseArr = []
                 }
                 
                 stream.resume();
             })
             .on('end', async () => {
                 try {
-                    
+                    await Promise.all(promiseArr)
                     resolve();
                 } catch (error) {
                     console.error('Error during image processing:', error);
@@ -915,14 +1048,15 @@ function collectAttributeValues() {
 }
 
 async function makeItems() {
+    let failedList = []
     let allValues = collectAttributeValues();
     
     // Update attribute allowed values without error handling
     for (const attribute of Object.keys(allValues)) {
         let remoteValue = attribute
-        if(attribute == 'sizeValues'){remoteValue = '0f0eb2bc-16c8-4d0c-bd05-1a81e75ae77a'}
+        if(attribute == 'sizeValues'){remoteValue = sizeAttribute}
         if(attribute == 'fitValues'){
-            remoteValue = '2fa2ad26-1a5b-49e1-84bd-a4e8b7d6b99c'
+            remoteValue = fitAttribute
         }
         if (attributeAllowedValues[remoteValue].type == 4 || attributeAllowedValues[remoteValue].type == 6) {
             for (const value of allValues[attribute]){
@@ -933,12 +1067,24 @@ async function makeItems() {
         }
     }
 
-    let missingList = []
     console.log('Creating items from product data...');
     const createdItems = [];
     
+    let promiseArr = []
+
     for (const parent of Object.keys(productData)) {
-        // if (parent != 'LWX1140NY71_NONE'){continue}
+        promiseArr.push(processItem(parent))
+        if (promiseArr.length >= 5){
+            await Promise.all(promiseArr)
+            promiseArr = []
+        }
+    }
+
+    fs.writeFileSync('./failed.txt', failedList.join('\n'), 'utf8');
+
+
+
+    async function processItem(parent){
         try{
             console.log(`Processing parent product: ${parent}`);
             const parentProduct = productData[parent];
@@ -976,7 +1122,7 @@ async function makeItems() {
             
             // Generate parent product attributes
             const parentAttributes = [{
-                "itemAttributeId": '259defac-d04b-4fa3-b97f-d57390a06169',
+                "itemAttributeId": parentProductAttribute,
                 "value": parent.split('_')[0]
             }];
             
@@ -1030,10 +1176,10 @@ async function makeItems() {
     
 
             if (parentProduct.hasSizeValueUniqueness){
-                parentData.variableAttributes.push('0f0eb2bc-16c8-4d0c-bd05-1a81e75ae77a')
+                parentData.variableAttributes.push(sizeAttribute)
             }
             if (parentProduct.hasFitValueUniqueness){
-                parentData.variableAttributes.push('2fa2ad26-1a5b-49e1-84bd-a4e8b7d6b99c')
+                parentData.variableAttributes.push(fitAttribute)
             }
     
             
@@ -1048,20 +1194,20 @@ async function makeItems() {
                 
                 // Initialize attributes array - link to parent
                 const attributes = [{
-                    "itemAttributeId": '259defac-d04b-4fa3-b97f-d57390a06169',
+                    "itemAttributeId": parentProductAttribute,
                     "value": parent
                 }];
     
                 if (parentProduct.variants[child]?.sizeValue != undefined && parentProduct.variants[child].sizeValue != ''){
                     attributes.push({
-                        "itemAttributeId": '0f0eb2bc-16c8-4d0c-bd05-1a81e75ae77a',
+                        "itemAttributeId": sizeAttribute,
                         "value": parentProduct.variants[child].sizeValue
                     });
                 }
     
                 if (parentProduct.variants[child]?.fitValue != undefined && parentProduct.variants[child].fitValue != ''){
                     attributes.push({
-                        "itemAttributeId": '2fa2ad26-1a5b-49e1-84bd-a4e8b7d6b99c',
+                        "itemAttributeId": fitAttribute,
                         "value": parentProduct.variants[child].fitValue
                     });
                 }
@@ -1113,8 +1259,6 @@ async function makeItems() {
                 };
                 try{childData.salePrice = {amount: parseFloat(((variant.attributes.FM['Retail Price\n(Inc Vat)'] / (1 + (parseFloat(variant.attributes.FM['Vat Rate']) / 100)))).toFixed(5)), currency: "GBP"}}catch{}
 
-                if(FMSupplierLookup[variant?.attributes?.FM?.['Supplier'].toLowerCase().trim()] == undefined){if(!missingList.includes(variant?.attributes?.FM?.['Supplier'].toLowerCase().trim())){missingList.push(variant?.attributes?.FM?.['Supplier'].toLowerCase().trim())}}
-
                 try {
                     if(suppliers[FMSupplierLookup[variant?.attributes?.FM?.['Supplier'].toLowerCase().trim()]] != undefined && variant?.attributes?.FM?.['Cost'] != undefined){
                         childData.unitsOfMeasure = [
@@ -1133,20 +1277,21 @@ async function makeItems() {
                 } catch {
 
                 }
-                // let childId = await processChildItem(childData, variant, parent);
-                // parentData.variantItems.push(childId);
+                let childId = await processChildItem(childData, variant, parent);
+                parentData.variantItems.push(childId);
                 console.log(`Created child item: ${child}`);
             }
             
             if (singleProduct) {
-                continue;
+                return;
             }
             
-            // await processParentItem(parentData, parentProduct);
-        } catch (e) {console.log(e)}
+            await processParentItem(parentData, parentProduct);
+        } catch (e) {
+            failedList.push(parent)
+            console.log(e)
+        }
     }
-
-    console.log(missingList)
 }
 
 async function processChildItem(childData, variant, parent){
@@ -1264,7 +1409,7 @@ async function run() {
         console.timeEnd('Save Product Data');
 
         console.time('Make Items');
-        await makeItems();
+        // await makeItems();
         console.timeEnd('Make Items');
         
         console.log('Product Data processing completed successfully');
