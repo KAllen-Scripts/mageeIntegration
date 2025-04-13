@@ -165,6 +165,8 @@ let FMSupplierLookup = {};
 let suppliers = {};
 let supplierTempLookup = {};
 
+
+//Will loop through these to remove fit letter from size, since the data is inconsistent
 const fitLookup = {
     R: "Regular",
     S: 'Short',
@@ -471,11 +473,14 @@ async function processFmCSV() {
                     if (productData[productCode].variants[formattedVariantKey].sizeValue === undefined) {
                         let sizeValue = row['Size'] ? row['Size'].trim() : '';
                         
-                        // If the Length (Ref 13) field exists, remove it from the end of the size
-                        const lengthField = row['Length (Ref 13)'] || row['Length\n(Ref 13)'];
-                        if (lengthField && sizeValue.endsWith(lengthField)) {
-                            sizeValue = sizeValue.substring(0, sizeValue.length - lengthField.length).trim();
+                        for (const fitValue of Object.keys(fitLookup)){
+                            const lengthField = fitValue;
+                            if (lengthField && sizeValue.endsWith(lengthField)) {
+                                sizeValue = sizeValue.substring(0, sizeValue.length - lengthField.length).trim();
+                            }
                         }
+
+
                         
                         // Set the processed size value on the variant
                         productData[productCode].variants[formattedVariantKey].sizeValue = sizeValue;
