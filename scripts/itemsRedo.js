@@ -9,7 +9,7 @@ const itemsFilePath = path.resolve(__dirname, '../files - new/data.json');
 const imagesFilePath = path.resolve(__dirname, '../files - new/images.json');
 const protexSKUFolder = path.resolve(__dirname, '../files - new/Product SKU');
 const protexProductFolderPath = path.resolve(__dirname, '../files - new/product');
-const fmFolderPath = path.resolve(__dirname, '../files - new/FM');
+const fmFilePath = path.resolve(__dirname, '../files - new/FM/250225_FM Product Data - all skus 25.02.25.csv');
 const siteProductsFilePath = path.resolve(__dirname, '../files - new/website/Models_11042025104320.csv');
 const attributeNamesFilePath = path.resolve(__dirname, '../files - new/website/Attribute Names.csv');
 const attributeValuesFilePath = path.resolve(__dirname, '../files - new/website/Attribute Values.csv');
@@ -316,18 +316,11 @@ async function processProtexCSV() {
                     if (!productData[productCode]) {
                         productData[productCode] = {
                             name: productName,
-                            attributes: {
-                                Protex: row
-                            },
+                            attributes: {},
                             variants: {},
                             singleItemSKU: row['Product']
                         };
-                    } else if (!productData[productCode].attributes.Protex) {
-                        // Ensure Protex attribute exists if the product already exists
-                        productData[productCode].attributes.Protex = row;
                     }
-                    
-                    productData[productCode].attributes.Protex = row;
 
                     // Create the properly formatted variant key (ProductCode_ColorCode-SizeFit)
                     const formattedVariantKey = `${row['Product']}_${row['Colour Code']}-${row['Size'] || ''}${row['Fit'] ? row['Fit'].charAt(0) : ''}`;
@@ -343,8 +336,6 @@ async function processProtexCSV() {
                             fitValue: fitLookup[row['Fit']]
                         };
                     }
-
-                    productData[productCode].variants[formattedVariantKey].attributes.Protex = row;
                     
                     // Add data
                     if (ean) productData[productCode].variants[formattedVariantKey].barcodes.push(ean);
@@ -379,146 +370,129 @@ async function processProtexCSV() {
     console.log(`Processed all CSV files. Total products: ${Object.keys(productData).length}`);
 }
 
-// Process FM CSV files from a folder
+// Process FM CSV
 async function processFmCSV() {
-    // Get all CSV files in the folder
-    const files = await fs.promises.readdir(fmFolderPath);
-    const csvFiles = files.filter(file => file.toLowerCase().endsWith('.csv'));
-    
-    console.log(`Found ${csvFiles.length} FM CSV files in ${fmFolderPath}`);
-    
-    // Process each CSV file sequentially
-    for (const csvFile of csvFiles) {
-        const fmFilePath = path.join(fmFolderPath, csvFile);
-        console.log(`Processing FM CSV: ${csvFile}...`);
-        
-        await new Promise((resolve, reject) => {
-            const stream = fs.createReadStream(fmFilePath)
-                .pipe(fastcsv.parse({ 
-                    headers: true, 
-                    trim: true,
-                    // Handle carriage returns and other whitespace in headers
-                    transformHeader: (header) => {
-                        return header.replace(/\r\n|\n|\r/g, ' ').trim();
-                    }
-                }))
-                .on('error', error => {
-                    console.error(`Error parsing FM CSV ${csvFile}:`, error);
-                    reject(error);
-                })
-                .on('data', async row => {
-                    stream.pause();
-                    
-                    // Map FM fields to Protex fields
-                    const product = row['SPC'] ? row['SPC'].trim() : '';
-                    const colorCode = row['Colour'] ? row['Colour'].trim() : '';
-                    const size = row['Size'] ? row['Size'].trim() : '';
-                    const description = row['Description'] ? row['Description'].trim() : '';
-                    
-                    // Skip if essential data is missing
-                    if (!product || !colorCode) {
-                        stream.resume();
-                        return;
-                    }
-                    
-                    const productCode = `${product}_${colorCode}`;
-                    
-                    // Create or update product
-                    if (!productData[productCode]) {
-                        productData[productCode] = {
-                            name: description || product,
-                            attributes: {
-                                Protex: {}
-                            },
-                            variants: {},
-                            singleItemSKU: product
-                        };
-                    } else if (!productData[productCode].attributes.Protex) {
-                        // Ensure Protex attribute exists if the product already exists
-                        productData[productCode].attributes.Protex = {};
-                    }
-                    
-                    // Try to determine fit and size from the combined size field
-                    let sizeName = size;
-                    let fitChar = '';
-                    
-                    // Check if the size ends with a letter that might indicate fit (S, R, L)
-                    const sizeMatch = size.match(/^(\d+)([SRL])$/i);
-                    if (sizeMatch) {
-                        sizeName = sizeMatch[1];
-                        fitChar = sizeMatch[2].toUpperCase();
-                    }
-                    
-                    // Create variant key
-                    const formattedVariantKey = `${product}_${colorCode}-${sizeName}${fitChar}`;
-                    
-                    // Create or update variant
-                    if (!productData[productCode].variants[formattedVariantKey]) {
-                        productData[productCode].variants[formattedVariantKey] = {
-                            name: `${description || product}_${colorCode}-${size}`,
-                            barcodes: [],
-                            attributes: {},
-                            altCodes: []
-                        };
-                    }
-
-                    productData[productCode].variants[formattedVariantKey].attributes.FM = row;
-                    productData[productCode].attributes.FM = row;
-
-                    if (productData[productCode].variants[formattedVariantKey].fitValue === undefined) {
-                        productData[productCode].variants[formattedVariantKey].fitValue = fitLookup[row['Length (Ref 13)']?.trim()]
-                    }
-                    
-                    // Only set the sizeValue if it's not already defined
-                    if (productData[productCode].variants[formattedVariantKey].sizeValue === undefined) {
-                        let sizeValue = row['Size'] ? row['Size'].trim() : '';
-                        
-                        for (const fitValue of Object.keys(fitLookup)){
-                            const lengthField = fitValue;
-                            if (lengthField && sizeValue.endsWith(lengthField)) {
-                                sizeValue = sizeValue.substring(0, sizeValue.length - lengthField.length).trim();
-                            }
-                        }
-
-
-                        
-                        // Set the processed size value on the variant
-                        productData[productCode].variants[formattedVariantKey].sizeValue = sizeValue;
-                    }
-                    
-                    // Add barcodes
-                    const systemBarcode = row['System Barcode'] ? row['System Barcode'].toString().trim() : '';
-                    const gtin1 = row['GTIN Barcode (H1)'] ? row['GTIN Barcode (H1)'].toString().trim() : '';
-                    const gtin2 = row['GTIN Barcode (1)'] ? row['GTIN Barcode (1)'].toString().trim() : '';
-                    
-                    if (systemBarcode && !productData[productCode].variants[formattedVariantKey].barcodes.includes(systemBarcode)) {
-                        productData[productCode].variants[formattedVariantKey].barcodes.push(systemBarcode);
-                    }
-                    
-                    if (gtin1 && !isNaN(gtin1) && !productData[productCode].variants[formattedVariantKey].barcodes.includes(gtin1)) {
-                        productData[productCode].variants[formattedVariantKey].barcodes.push(gtin1);
-                    }
-                    
-                    if (gtin2 && !isNaN(gtin2) && !productData[productCode].variants[formattedVariantKey].barcodes.includes(gtin2)) {
-                        productData[productCode].variants[formattedVariantKey].barcodes.push(gtin2);
-                    }
-                    
-                    // Add alternate SKU codes
-                    const dashVariantKey = `${product}-${colorCode}-${sizeName}${fitChar}`;
-                    if (dashVariantKey && !productData[productCode].variants[formattedVariantKey].altCodes.includes(dashVariantKey)) {
-                        productData[productCode].variants[formattedVariantKey].altCodes.push(dashVariantKey);
-                    }
-                    
+    return new Promise((resolve, reject) => {
+        const stream = fs.createReadStream(fmFilePath)
+            .pipe(fastcsv.parse({ 
+                headers: true, 
+                trim: true,
+                // Handle carriage returns and other whitespace in headers
+                transformHeader: (header) => {
+                    return header.replace(/\r\n|\n|\r/g, ' ').trim();
+                }
+            }))
+            .on('error', error => {
+                console.error('Error parsing FM CSV:', error);
+                reject(error);
+            })
+            .on('data', async row => {
+                stream.pause();
+                
+                // Map FM fields to Protex fields
+                const product = row['SPC'] ? row['SPC'].trim() : '';
+                const colorCode = row['Colour'] ? (isNaN(Number(row['Colour'].trim())) ? row['Colour'].trim() : String(Number(row['Colour'].trim()))) : '';
+                const size = row['Size'] ? row['Size'].trim() : '';
+                const description = row['Description'] ? row['Description'].trim() : '';
+                
+                // Skip if essential data is missing
+                if (!product || !colorCode) {
                     stream.resume();
-                })
-                .on('end', () => {
-                    console.log(`Finished processing ${csvFile}`);
-                    resolve();
-                });
-        });
-    }
-    
-    console.log(`Processed all FM CSV files`);
+                    return;
+                }
+                
+                const productCode = `${product}_${colorCode}`;
+
+                
+                // Create or update product
+                if (!productData[productCode]) {
+                    productData[productCode] = {
+                        name: description || product,
+                        attributes: {
+                            Protex: {}
+                        },
+                        variants: {},
+                        singleItemSKU: product
+                    };
+                } else if (!productData[productCode].attributes.Protex) {
+                    // Ensure Protex attribute exists if the product already exists
+                    productData[productCode].attributes.Protex = {};
+                }
+                
+                // Try to determine fit and size from the combined size field
+                let sizeName = size;
+                let fitChar = '';
+                
+                // Check if the size ends with a letter that might indicate fit (S, R, L)
+                const sizeMatch = size.match(/^(\d+)([SRL])$/i);
+                if (sizeMatch) {
+                    sizeName = sizeMatch[1];
+                    fitChar = sizeMatch[2].toUpperCase();
+                }
+                
+                // Create variant key
+                const formattedVariantKey = `${product}_${colorCode}-${sizeName}${fitChar}`;
+                
+                // Create or update variant
+                if (!productData[productCode].variants[formattedVariantKey]) {
+                    productData[productCode].variants[formattedVariantKey] = {
+                        name: `${description || product}_${colorCode}-${size}`,
+                        barcodes: [],
+                        attributes: {},
+                        altCodes: []
+                    };
+                }
+
+                productData[productCode].variants[formattedVariantKey].attributes.FM = row;
+                productData[productCode].attributes.FM = row;
+
+                if (productData[productCode].variants[formattedVariantKey].fitValue === undefined) {
+                    productData[productCode].variants[formattedVariantKey].fitValue = fitLookup[row['Length\n(Ref 13)'].trim()]
+                }
+                
+                // Only set the sizeValue if it's not already defined
+                if (productData[productCode].variants[formattedVariantKey].sizeValue === undefined) {
+                    let sizeValue = row['Size'] ? row['Size'].trim() : '';
+                    
+                    // If the Length (Ref 13) field exists, remove it from the end of the size
+                    if (row['Length\n(Ref 13)'] && sizeValue.endsWith(row['Length\n(Ref 13)'])) {
+                        sizeValue = sizeValue.substring(0, sizeValue.length - row['Length\n(Ref 13)'].length).trim();
+                    }
+                    
+                    // Set the processed size value on the variant
+                    productData[productCode].variants[formattedVariantKey].sizeValue = sizeValue;
+                }
+                
+                // Add barcodes
+                const systemBarcode = row['System Barcode'] ? row['System Barcode'].toString().trim() : '';
+                const gtin1 = row['GTIN Barcode (H1)'] ? row['GTIN Barcode (H1)'].toString().trim() : '';
+                const gtin2 = row['GTIN Barcode (1)'] ? row['GTIN Barcode (1)'].toString().trim() : '';
+                
+                if (systemBarcode && !productData[productCode].variants[formattedVariantKey].barcodes.includes(systemBarcode)) {
+                    productData[productCode].variants[formattedVariantKey].barcodes.push(systemBarcode);
+                }
+                
+                if (gtin1 && !isNaN(gtin1) && !productData[productCode].variants[formattedVariantKey].barcodes.includes(gtin1)) {
+                    productData[productCode].variants[formattedVariantKey].barcodes.push(gtin1);
+                }
+                
+                if (gtin2 && !isNaN(gtin2) && !productData[productCode].variants[formattedVariantKey].barcodes.includes(gtin2)) {
+                    productData[productCode].variants[formattedVariantKey].barcodes.push(gtin2);
+                }
+                
+                // Add alternate SKU codes
+                const dashVariantKey = `${product}-${colorCode}-${sizeName}${fitChar}`;
+                if (dashVariantKey && !productData[productCode].variants[formattedVariantKey].altCodes.includes(dashVariantKey)) {
+                    productData[productCode].variants[formattedVariantKey].altCodes.push(dashVariantKey);
+                }
+                
+                stream.resume();
+            })
+            .on('end', () => {
+                console.log(`Processed FM CSV data`);
+                resolve();
+            });
+    });
 }
 
 // Process Protex Product CSV files from a folder
@@ -558,28 +532,11 @@ async function processProtexProductCSV() {
                     // Check if the product already exists in our data
                     if (productData[combinedProductCode]) {
                         // Create a 'Protex' object for the product attributes
-                        productData[combinedProductCode].attributes['Protex'] = {};
-                        
-                        // Add all fields from the Protex product row to the product attributes
-                        Object.keys(row).forEach(key => {
-                            if (row[key] !== undefined && row[key] !== null && row[key] !== '') {
-                                productData[combinedProductCode].attributes['Protex'][key] = row[key].toString().trim();
-                            }
-                        });
+                        productData[combinedProductCode].attributes['Protex'] = row;
                         
                         // Also add the Protex data to all variants of this product
                         Object.keys(productData[combinedProductCode].variants).forEach(variantKey => {
-                            // Initialize Protex object for variant if it doesn't exist
-                            if (!productData[combinedProductCode].variants[variantKey].attributes['Protex']) {
-                                productData[combinedProductCode].variants[variantKey].attributes['Protex'] = {};
-                            }
-                            
-                            // Add product data to variant
-                            Object.keys(row).forEach(key => {
-                                if (row[key] !== undefined && row[key] !== null && row[key] !== '') {
-                                    productData[combinedProductCode].variants[variantKey].attributes['Protex'][key] = row[key].toString().trim();
-                                }
-                            });
+                            productData[combinedProductCode].variants[variantKey].attributes['Protex'] = row
                         });
                     }
                     
@@ -1067,7 +1024,7 @@ async function makeItems() {
     const createdItems = [];
 
     for (const parent of Object.keys(productData)) {
-        processItem(parent)
+        await processItem(parent)
     }
 
     fs.writeFileSync('./failed.txt', failedList.join('\n'), 'utf8');
@@ -1079,12 +1036,14 @@ async function makeItems() {
             console.log(`Processing parent product: ${parent}`);
             const parentProduct = productData[parent];
 
-            if (itemTypes[parentProduct.attributes.FM['Type'].toLowerCase().trim()] == undefined){
+
+            const type = parentProduct?.attributes?.FM?.['Type'];
+            if (!type || itemTypes?.[type.toLowerCase().trim()] == undefined){
                 await common.requester('post', `https://${global.enviroment}/v0/item-types`, {"name":parentProduct.attributes.FM['Type']}).then(r=>{
                     itemTypes[parentProduct.attributes.FM['Type'].toLowerCase().trim()] = r.data.data.id
                 })
             }
-            
+
             // Check if sizeValue and fitValue vary across children
             const sizeValues = new Set();
             const fitValues = new Set();
@@ -1101,6 +1060,7 @@ async function makeItems() {
                     fitValues.add(variant.fitValue);
                 }
             }
+
             
             // Check if we have variation (more than one distinct value)
             const hasSizeValueVariation = sizeValues.size > 1;
@@ -1399,7 +1359,7 @@ async function run() {
         console.timeEnd('Save Product Data');
 
         console.time('Make Items');
-        // await makeItems();
+        await makeItems();
         console.timeEnd('Make Items');
         
         console.log('Product Data processing completed successfully');
