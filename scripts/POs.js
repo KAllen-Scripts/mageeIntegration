@@ -3,6 +3,7 @@ const fs = require('fs');
 const csv = require('fast-csv');
 process.chdir(__dirname);
 
+
 // Input files
 let customerSheet = '../files/manufacturing/suppliers.csv';
 let ordersSheet = '../files/purchaseOrders/RMPO_20241216155110.csv';
@@ -17,6 +18,15 @@ let locationLookup = {};
 // Global tracker for all deliveries across all orders
 let allDeliveries = [];
 let allTransfers = {};
+let transferArr = [];
+
+let existsingPOs = []
+
+const multiplicationExceptions = ['Velvet', 'Cloth', 'Fully Factored', 'Button']
+
+const useSKUArr = ['Button','Sundry','Woven Label','Ticket/Story','Cloth','Buckle']
+
+let logWrite = fs.createWriteStream('./PODebug.txt', {flags: 'a'})
 
 // Standard VAT/sales tax rates
 let standardRates = {
@@ -92,7 +102,7 @@ function parseFloatSafe(value, decimals = 2) {
 }
 
 // Helper function to handle request failures with automatic retries
-async function safeRequest(method, url, data = undefined, maxRetries = 5, retryDelay = 1000) {
+async function safeRequest(method, url, data = undefined, maxRetries = 10, retryDelay = 1000) {
     let retries = 0;
     
     while (retries <= maxRetries) {
@@ -138,16 +148,24 @@ async function safeRequest(method, url, data = undefined, maxRetries = 5, retryD
 
 // Get all suppliers from API
 async function getAllSuppliers() {
-    await common.loopThrough('Getting Suppliers', 'https://api.stok.ly/v1/suppliers', 'size=1000', '[status]!={1}', (supplier) => {
+    await common.loopThrough('Getting Suppliers', `https://${global.enviroment}/v1/suppliers`, 'size=1000', '[status]!={1}', (supplier) => {
         try {
             suppliers[parseInt(supplier.accountReference)] = supplier.supplierId;
         } catch (error) {}
     });
 }
 
+async function getAllPOs() {
+    await common.loopThrough('Getting POs', `https://${global.enviroment}/v0/purchase-orders`, 'size=1000', '', (PO) => {
+        try {
+            existsingPOs.push(PO.externalReference.split('||')[1].trim())
+        } catch (error) {}
+    });
+}
+
 // Get all locations from API
 async function getAllLocations() {
-    await common.loopThrough('Getting Locations', 'https://api.stok.ly/v0/locations', 'size=1000', '[status]=={0}', async (location) => {
+    await common.loopThrough('Getting Locations', `https://${global.enviroment}/v0/locations`, 'size=1000', '[status]=={0}', async (location) => {
         locations[location.name.toLowerCase().trim()] = location.locationId;
         try{locationLookup[location.name.split('-')[1].trim()] = location.locationId}catch{}
     });
@@ -155,7 +173,7 @@ async function getAllLocations() {
 
 // Get all items from API with enhanced data storage
 async function getAllItems() {
-    await common.loopThrough('Getting Items', 'https://api.stok.ly/v0/items', 'size=1000&sortDirection=ASC&sortField=name', '([status]!={1})', (item) => {
+    await common.loopThrough('Getting Items', `https://${global.enviroment}/v0/items`, 'size=1000&sortDirection=ASC&sortField=name', '([status]!={1})', (item) => {
         // Store item with more complete information
         items[item.name.toLowerCase().trim()] = {
             itemId: item.itemId,
@@ -209,41 +227,7 @@ async function getOrdersSheet() {
                 const deliveryDate = row['delivery date'];
                 const skuCode = (row['sku code'] || '').toLowerCase().trim();
                 const isClosed = row['colour order status']?.toLowerCase()?.trim() === 'closed';
-                
-                // Track transfers by supplier, warehouse, and date
-                const supplierCode = row['supplier code'];
-                const warehouseName = row['warehouse name'];
-                const receivedQuantity = parseFloatSafe(row['order received quantity'], 2) || 0;
 
-                // Only process rows with valid data for transfers and non-zero received quantity
-                if (supplierCode && warehouseName && deliveryDate && receivedQuantity > 0) {
-                    // Initialize supplier if it doesn't exist
-                    if (!allTransfers[supplierCode]) {
-                        allTransfers[supplierCode] = {};
-                    }
-                    
-                    // Initialize warehouse if it doesn't exist
-                    if (!allTransfers[supplierCode][warehouseName]) {
-                        allTransfers[supplierCode][warehouseName] = {};
-                    }
-                    
-                    // Initialize date if it doesn't exist
-                    if (!allTransfers[supplierCode][warehouseName][deliveryDate]) {
-                        allTransfers[supplierCode][warehouseName][deliveryDate] = {
-                            items: {}
-                        };
-                    }
-                    
-                    // Add or update item quantity - skip zero quantities
-                    if (receivedQuantity > 0) {
-                        if (!allTransfers[supplierCode][warehouseName][deliveryDate].items[skuCode]) {
-                            allTransfers[supplierCode][warehouseName][deliveryDate].items[skuCode] = receivedQuantity;
-                        } else {
-                            allTransfers[supplierCode][warehouseName][deliveryDate].items[skuCode] += receivedQuantity;
-                        }
-                    }
-                }
-                
                 // Initialize order if it doesn't exist
                 if (!saleOrders[orderNumber]) {
                     saleOrders[orderNumber] = {
@@ -334,24 +318,43 @@ async function getLocation(manufacturerName) {
     for (const location in locations){
         if (location.toLowerCase().trim().includes(manufacturerName.toLowerCase().trim())){return locations[location]}
     }
-    return null
+    console.log('///////////////////////////////////////////////////////////////////////////////////\n\nNUMBER 2 \n\n///////////////////////////////////////////////////////////////////////////////////')
+    return safeRequest('post', `https://${global.enviroment}/v0/locations`, {
+        "name": manufacturerName,
+        "address": {
+            "line1": "Default",
+            "line2": "",
+            "city": "Default",
+            "country": "IE",
+            "postcode": "XXX XXX",
+            "region": ""
+        },
+        "contacts": []
+    }).then(r=>{
+        locations[manufacturerName.toLowerCase().trim()] = r.data.data.id
+        return r.data.data.id
+    })
 }
 
-/**
- * Process orders by creating purchase orders for each sale order
- */
-async function makeOrders() {
-    for (const orderNumber of Object.keys(saleOrders)) {
 
-       try{
+async function makeOrders(orderNumberDebug = false) {
+    for (const orderNumber of Object.keys(saleOrders)) {
+        if(existsingPOs.includes(orderNumber)){continue}
+        if (orderNumberDebug != false && orderNumber != orderNumberDebug){continue}
         const order = saleOrders[orderNumber];
         console.log(`Processing order ${orderNumber}...`);
 
         let locationId = locationLookup[order.supplier]
+        let locationContactId
 
         if (locationId == undefined){
-            await common.requester('post', `https://api.stok.ly/v0/locations`, {
-                "name": `${order.supplierName} - ${order.supplier}`,
+
+            let locationName = `${order.supplierName} - ${order.supplier}`
+
+            console.log('///////////////////////////////////////////////////////////////////////////////////\n\nNUMBER 1 \n\n///////////////////////////////////////////////////////////////////////////////////')
+
+            await common.requester('post', `https://${global.enviroment}/v0/locations`, {
+                "name": locationName,
                 "address": {
                     "line1": "default",
                     "city": "default",
@@ -376,13 +379,35 @@ async function makeOrders() {
             }).then(async r=>{
                 locationLookup[order.supplier] = r.data.data.id
                 locationId = r.data.data.id
+                locations[locationName.toLowerCase().trim()] = r.data.data.id
+
+                let attempts = 0;
+
+                while (locationContactId === undefined && attempts < 100) {
+                    const contactResponse = await safeRequest('get', `https://${global.enviroment}/v0/locations/${locationId}/contacts`);
+                    locationContactId = contactResponse?.data?.data?.[0]?.contactId;
+                    
+                    if (locationContactId === undefined) {
+                        attempts++;
+                        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 1 second before retry
+                    }
+                }
             })
         }
 
-        let locationContactId = await common.requester('get', `https://api.stok.ly/v0/locations/${locationId}/contacts`).then(r=>{return r?.data?.data?.[0]?.contactId})
+        let attempts = 0;
+        while (locationContactId === undefined && attempts < 1000) {
+            const contactResponse = await safeRequest('get', `https://${global.enviroment}/v0/locations/${locationId}/contacts`);
+            locationContactId = contactResponse?.data?.data?.[0]?.contactId;
+            
+            if (locationContactId === undefined) {
+                attempts++;
+                await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 1 second before retry
+            }
+        }
 
         if(locationContactId == undefined){
-            await common.requester('patch', `https://api.stok.ly/v0/locations/${locationId}`, {
+            await safeRequest('patch', `https://${global.enviroment}/v0/locations/${locationId}`, {
                 "contacts": [
                     {
                         "forename": "contact",
@@ -398,12 +423,22 @@ async function makeOrders() {
                     }
                 ]
             });
-            locationContactId = await common.requester('get', `https://api.stok.ly/v0/locations/${locationId}/contacts`).then(r=>{return r?.data?.data?.[0]?.contactId})
+            let attempts = 0;
+            while (locationContactId === undefined && attempts < 1000) {
+                const contactResponse = await safeRequest('get', `https://${global.enviroment}/v0/locations/${locationId}/contacts`);
+                locationContactId = contactResponse?.data?.data?.[0]?.contactId;
+                
+                if (locationContactId === undefined) {
+                    attempts++;
+                    await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 1 second before retry
+                }
+            }
         }
-        
+
+
         // Create or update supplier
         const supplierMethod = suppliers[order.supplier] ? 'patch' : 'post';
-        const supplierEndpoint = `https://api.stok.ly/v1/suppliers${supplierMethod === 'patch' ? '/' + suppliers[order.supplier] : ''}`;
+        const supplierEndpoint = `https://${global.enviroment}/v1/suppliers${supplierMethod === 'patch' ? '/' + suppliers[order.supplier] : ''}`;
         
         const customerData = customersFromSheet[order.supplier] || {};
         const supplierName = customerData.name || order.supplierName || `Supplier ${order.supplier}`;
@@ -414,15 +449,16 @@ async function makeOrders() {
 
         // Get supplier contact if supplier exists
         if (supplierId) {
-            const contactResponse = await common.requester('get', `https://api.stok.ly/v1/suppliers/${supplierId}/contacts`);
+            const contactResponse = await safeRequest('get', `https://${global.enviroment}/v1/suppliers/${supplierId}/contacts`);
             supplierContactId = contactResponse.data.data[0]?.contactId;
         }
 
-        if (!supplierId || supplierContactId === undefined) {
+        if (!supplierId || supplierContactId == undefined) {
             // Create supplier payload
             const supplierPayload = {
                 "name": supplierName,
                 "type": 1,
+                dropShips: false,
                 "accountReference": order.supplier,
                 "vatNumber": {
                     "value": customerData['vat registration number'] || String(order.supplier),
@@ -453,13 +489,22 @@ async function makeOrders() {
             };
             
             // Create or update supplier and get ID
-            const supplierResponse = await common.requester(supplierMethod, supplierEndpoint, supplierPayload);
+            const supplierResponse = await safeRequest(supplierMethod, supplierEndpoint, supplierPayload);
             await common.sleep(200);
             supplierId = supplierResponse.data.data.id;
+            suppliers[order.supplier] = supplierResponse.data.data.id;
             
-            // Now get the supplier contact
-            const contactResponse = await common.requester('get', `https://api.stok.ly/v1/suppliers/${supplierId}/contacts`);
-            supplierContactId = contactResponse.data.data[0]?.contactId;
+            let attempts = 0;
+            
+            while (supplierContactId === undefined && attempts < 5) {
+              const contactResponse = await safeRequest('get', `https://${global.enviroment}/v1/suppliers/${supplierId}/contacts`);
+              supplierContactId = contactResponse.data.data[0]?.contactId;
+              
+              if (supplierContactId === undefined) {
+                attempts++;
+                await new Promise(resolve => setTimeout(resolve, 2000));
+              }
+            }
         }
 
         // Create purchase order object
@@ -507,67 +552,88 @@ async function makeOrders() {
         
         // Process items for purchase order
         for (const item of order.items) {
-            const skuCode = (item['sku code'] || '').toLowerCase().trim();
+            const skuCode = (useSKUArr.includes(item['rm type name']) ? item['sku code'] : item['rm name']).toLowerCase().trim()
+            const skuCodeCasePreserved = (useSKUArr.includes(item['rm type name']) ? item['sku code'] : item['rm name'])
             
             // Create or update item if it doesn't exist
+            console.log(skuCode)
+            await common.askQuestion(1)
             if (!items[skuCode]) {
                 const itemPayload = {
                     "isSold": true,
                     "acquisition": 0,
                     "format": 0,
                     "name": item['sku code'],
-                    "sku": item['rm name'],
+                    "sku": skuCodeCasePreserved,
                     "unitsOfMeasure": [
                         {
                             "supplierId": supplierId,
-                            "supplierSku": item['rm name'],
+                            "supplierSku": skuCodeCasePreserved,
                             "cost": {
-                                "amount": parseFloatSafe(item['order price'], 2) || 0,
+                                "amount": multiplicationExceptions.includes(item['rm type name']) ? parseFloatSafe(item['order price'], 2) * 100 || 0 : (parseFloatSafe(item['order price'], 2) || 0),
                                 "currency": order.currency
                             },
                             "currency": order.currency,
-                            "quantityInUnit": 1
+                            "quantityInUnit": multiplicationExceptions.includes(item['rm type name']) ? 100 : 1
                         }
                     ]
                 };
                 
                 console.log(`Creating new item: ${skuCode}`);
-                const itemResponse = await common.requester('post', 'https://api.stok.ly/v0/items', itemPayload);
+                const itemResponse = await safeRequest('post', `https://${global.enviroment}/v0/items`, itemPayload);
                 
                 // Save item information
                 items[skuCode] = {
                     itemId: itemResponse.data.data.id,
                     name: item['sku code'],
-                    sku: item['sku code']
+                    sku: skuCode
                 };
-                
-                // Wait a moment for the API to process the new item
-                await common.sleep(200);
+            
             }
             
             // Get unit of measure
-            const uomResponse = await common.requester('get', `https://api.stok.ly/v0/items/${items[skuCode].itemId}/units-of-measure`);
-            let unitOfMeasure = uomResponse.data.data[0];
+            let unitOfMeasure;
+            let attempts = 0;
+
+            while (unitOfMeasure === undefined && attempts < 1000) {
+                const uomResponse = await safeRequest('get', `https://${global.enviroment}/v0/items/${items[skuCode].itemId}/units-of-measure`);
+                unitOfMeasure = uomResponse.data.data[0];
+                
+                if (unitOfMeasure === undefined) {
+                    attempts++;
+                    await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 1 second before retry
+                }
+            }
             
             // Create unit of measure if needed
             if (!unitOfMeasure) {
                 const uomPayload = {unitsOfMeasure:[{
                     "supplierId": supplierId,
-                    "supplierSku": item['rm name'] || item['sku code'],
+                    "supplierSku": skuCode,
                     "cost": {
-                        "amount": parseFloatSafe(item['order price'], 2) || 0,
+                        "amount": multiplicationExceptions.includes(item['rm type name']) ? parseFloatSafe(item['order price'], 2) * 100 || 0 : (parseFloatSafe(item['order price'], 2) || 0),
                         "currency": order.currency
                     },
                     "currency": order.currency,
-                    "quantityInUnit": 1
+                    "quantityInUnit": multiplicationExceptions.includes(item['rm type name']) ? 100 : 1
                 }]};
                 
                 console.log(`Creating UOM for item: ${skuCode}`);
-                await common.requester('patch', `https://api.stok.ly/v0/items/${items[skuCode].itemId}`, uomPayload);
+                await safeRequest('patch', `https://${global.enviroment}/v0/items/${items[skuCode].itemId}`, uomPayload);
                 
                 // Get the UOM again
-                const newUomResponse = await common.requester('get', `https://api.stok.ly/v0/items/${items[skuCode].itemId}/units-of-measure`);
-                unitOfMeasure = newUomResponse.data.data[0];
+                let unitOfMeasure;
+                let attempts = 0;
+    
+                while (unitOfMeasure === undefined && attempts < 1000) {
+                    const uomResponse = await safeRequest('get', `https://${global.enviroment}/v0/items/${items[skuCode].itemId}/units-of-measure`);
+                    unitOfMeasure = uomResponse.data.data[0];
+                    
+                    if (unitOfMeasure === undefined) {
+                        attempts++;
+                        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 1 second before retry
+                    }
+                }
             }
             
             // Add item to purchase order with adjusted quantity and price
@@ -588,7 +654,7 @@ async function makeOrders() {
             purchaseOrder.items.push({
                 "itemId": items[skuCode].itemId,
                 "lineDiscount": 0,
-                "quantity": quantityToUse,
+                "quantity": multiplicationExceptions.includes(item['rm type name']) ? quantityToUse / 100 : quantityToUse,
                 "price": price,
                 "tax": tax,
                 "discount": 0,
@@ -603,14 +669,22 @@ async function makeOrders() {
                 "unitCost": unitOfMeasure.cost,
                 "taxRate": 0
             });
+
+            if (allTransfers[orderNumber] == undefined){allTransfers[orderNumber] = {source: `${item['supplier name']} - ${item['supplier code']}`, destinations: {}}}
+            if (allTransfers[orderNumber].destinations[item[`warehouse name`]] == undefined){allTransfers[orderNumber].destinations[item[`warehouse name`]] = {}}
+            if (allTransfers[orderNumber].destinations[item[`warehouse name`]][item['delivery date']] == undefined){allTransfers[orderNumber].destinations[item[`warehouse name`]][item['delivery date']] = {}}
+            allTransfers[orderNumber].destinations[item[`warehouse name`]][item['delivery date']][items[(useSKUArr.includes(item['rm type name']) ? item['sku code'] : item['rm name']).toLowerCase().trim()].itemId] = item['order received quantity']
         }
 
+
+        logWrite.write(JSON.stringify(purchaseOrder) + '\r\n\r\n')
+
         // Create purchase order
-        const poResponse = await common.requester('post', 'https://api.stok.ly/v0/purchase-orders', purchaseOrder);
+        const poResponse = await safeRequest('post', `https://${global.enviroment}/v0/purchase-orders`, purchaseOrder);
         const purchaseOrderId = poResponse.data.data.id;
         
-        await common.requester('post', `https://api.stok.ly/v0/purchase-orders/${purchaseOrderId}/approvals`, {"forced":false});
-        await common.requester('post', `https://api.stok.ly/v0/purchase-orders/${purchaseOrderId}/submissions`, {"forced":false});
+        await safeRequest('post', `https://${global.enviroment}/v0/purchase-orders/${purchaseOrderId}/approvals`, {"forced":false});
+        await safeRequest('post', `https://${global.enviroment}/v0/purchase-orders/${purchaseOrderId}/submissions`, {"forced":false});
         
         console.log(`Created purchase order for ${orderNumber}, ID: ${purchaseOrderId}`);
         
@@ -655,6 +729,7 @@ async function makeOrders() {
                             tax,
                             displayLinePrice,
                             displayLineTax,
+                            type: originalItem['rm type name'],
                             // Add additional item information
                             itemName: items[item.skuCode] ? items[item.skuCode].name : item.rmName,
                             itemSku: items[item.skuCode] ? items[item.skuCode].sku : item.skuCode
@@ -683,9 +758,6 @@ async function makeOrders() {
                 }
             }
         }
-       } catch {
-
-       }
         
 
     }
@@ -765,7 +837,7 @@ async function processDeliveries() {
                     invoice.invoices[0].items.push({
                         "referenceType": "item",
                         "referenceId": items[skuCode].itemId,
-                        "quantity": round(item.quantity || 0, 2),
+                        "quantity": multiplicationExceptions.includes(item.type) ? round(item.quantity || 0, 2) / 100 : round(item.quantity || 0, 2),
                         "displayPrice": round((item.unitPrice || 0) * (item.quantity || 0), 2),
                         "displayTax": round((((item.unitPrice || 0) * (item.quantity || 0)) * delivery.taxMod) - ((item.unitPrice || 0) * (item.quantity || 0)), 2),
                         "itemName": item.itemName || "Unknown",
@@ -784,11 +856,14 @@ async function processDeliveries() {
             }
     
             try {
-                let goodsReceiptId = await safeRequest('post', 'https://api.stok.ly/v0/goods-receipts', receipt);
+                logWrite.write(JSON.stringify(receipt) + '\r\n\r\n')
+                logWrite.write(JSON.stringify(invoice) + '\r\n\r\n')
+
+                let goodsReceiptId = await safeRequest('post', `https://${global.enviroment}/v0/goods-receipts`, receipt);
                 console.log(`Created goods receipt: ${goodsReceiptId.data.data.id}`);
                 
                 try {
-                    await safeRequest('post', `https://api.stok.ly/v0/goods-receipts/${goodsReceiptId.data.data.id}/completions`);
+                    await safeRequest('post', `https://${global.enviroment}/v0/goods-receipts/${goodsReceiptId.data.data.id}/completions`);
                     console.log(`Completed goods receipt: ${goodsReceiptId.data.data.id}`);
                 } catch (error) {
                     console.error(`Failed to complete goods receipt ${goodsReceiptId.data.data.id}: ${error.message}`);
@@ -796,7 +871,7 @@ async function processDeliveries() {
                 }
                 
                 try {
-                    await safeRequest('post', `https://api.stok.ly/v0/purchase-orders/${delivery.purchaseOrderId}/add-invoices`, invoice);
+                    await safeRequest('post', `https://${global.enviroment}/v0/purchase-orders/${delivery.purchaseOrderId}/add-invoices`, invoice);
                     console.log(`Added invoice to PO: ${delivery.purchaseOrderId}`);
                 } catch (error) {
                     console.error(`Failed to add invoice to PO ${delivery.purchaseOrderId}: ${error.message}`);
@@ -808,6 +883,7 @@ async function processDeliveries() {
             }
         } catch (error) {
             console.error(`Error processing delivery on date ${delivery.date}: ${error.message}`);
+            await common.askQuestion(error)
             console.error(`Continuing with next delivery...`);
             // Continue with next delivery
         }
@@ -815,47 +891,24 @@ async function processDeliveries() {
 }
 
 async function processTransfers(){
-    for (const supplier of Object.keys(allTransfers)){
-        for (const location of Object.keys(allTransfers[supplier])){
-
-            for (const date of Object.keys(allTransfers[supplier][location])){
-                let locationId = await getLocation(location)
-                let transfer = {
-                    "sourceLocationId": locationLookup[supplier],
-                    "destinationLocationId": locationId,
-                    "courierRequired": false,
-                    "items": []
-                }
-
-                for (const item of Object.keys(allTransfers[supplier][location][date].items)){
-                    console.log(item)
-                    transfer.items.push({
-                        "itemId": items[item.toLowerCase().trim()].itemId,
-                        "quantity": allTransfers[supplier][location][date].items[item]
-                    })
-                }
-
-                try{
-                    await common.requester('post', 'https://api.stok.ly/v0/stock-transfers', transfer).then(async r=>{
-                        await common.requester('post', `https://api.stok.ly/v0/stock-transfers/${r.data.data.id}/submissions`)
-                    })
-                }catch (e) {
-                    console.log(e)
-                }
-            }
-        }
+    for (const transfer of transferArr){
+        await safeRequest('post', `https://${global.enviroment}/v0/stock-transfers`, transfer).then(async r=>{
+            await safeRequest('post', `https://${global.enviroment}/v0/stock-transfers/${r.data.data.id}/submissions`)
+        })
     }
 }
 
 // Main function
 async function run() {
-    // try {
-        // try {
-        //     await getAllSuppliers();
-        // } catch (error) {
-        //     console.error(`Error getting suppliers: ${error.message}`);
-        //     // Continue anyway, some suppliers might work
-        // }
+
+        await getAllPOs()
+
+        try {
+            await getAllSuppliers();
+        } catch (error) {
+            console.error(`Error getting suppliers: ${error.message}`);
+            // Continue anyway, some suppliers might work
+        }
         
         try {
             await getAllItems();
@@ -864,59 +917,83 @@ async function run() {
             // Continue anyway, some items might work
         }
         
-        // try {
-        //     await getCustomersSheet();
-        // } catch (error) {
-        //     console.error(`Error getting customer sheet: ${error.message}`);
-        //     // Continue anyway with empty customer data
-        // }
+        try {
+            await getCustomersSheet();
+        } catch (error) {
+            console.error(`Error getting customer sheet: ${error.message}`);
+            // Continue anyway with empty customer data
+        }
         
         try {
             await getOrdersSheet();
         } catch (error) {
             console.error(`Error getting orders sheet: ${error.message}`);
-            // This is more critical, but continue with whatever orders we have
         }
         
         await getAllLocations();
         
-        // await makeOrders();
+        //Terrible, hackey way of doing these one at a time, implemeted after everything was made. It works, screw it
+        for (const order of Object.keys(saleOrders)){
+            allTransfers = {}
+            allDeliveries = []
+            transferArr = []
+            await makeOrders(order);
         
-        // // Sort the global deliveries by date (oldest to newest)
-        // allDeliveries.sort((a, b) => {
-        //     // Convert string dates to numbers for comparison
-        //     const dateA = parseInt(a.date);
-        //     const dateB = parseInt(b.date);
-        //     return dateA - dateB;
-        // });
-        
-        // Log the global deliveries tracker
-        console.log(`Total delivery events tracked: ${allDeliveries.length}`);
-        
-        // await processDeliveries();
+            // Sort the global deliveries by date (oldest to newest)
+            allDeliveries.sort((a, b) => {
+                // Convert string dates to numbers for comparison
+                const dateA = parseInt(a.date);
+                const dateB = parseInt(b.date);
+                return dateA - dateB;
+            });
 
-        await processTransfers()
+    
+            for (const orderNumber of Object.keys(allTransfers)){
+                for (let destination of Object.keys(allTransfers[orderNumber].destinations)){
+                    for (const delivery of Object.keys(allTransfers[orderNumber].destinations[destination])){
+                        let locationId = await getLocation(destination)
+                        let sourceId = await getLocation(allTransfers[orderNumber].source)
+                        let transfer = {
+                            "sourceLocationId": sourceId,
+                            "destinationLocationId": locationId,
+                            "courierRequired": false,
+                            "items": [],
+                            delivery: delivery
+                        }
+                        for (const item of Object.keys(allTransfers[orderNumber].destinations[destination][delivery])){
+                            console.log(allTransfers[orderNumber].destinations[destination][delivery][item])
+                            transfer.items.push({
+                                itemId: item,
+                                quantity: allTransfers[orderNumber].destinations[destination][delivery][item]
+                            })
+                        }
+                        transferArr.push(transfer)
+                    }  
+                }
+            }
+
+            transferArr.sort((a, b) => {
+                // Convert the date strings to numbers for comparison
+                const dateA = parseInt(a.delivery, 10);
+                const dateB = parseInt(b.delivery, 10);
+                
+                // Sort from oldest to newest
+                return dateA - dateB;
+              });
+            
+            // Log the global deliveries tracker
+            console.log(`Total delivery events tracked: ${allDeliveries.length}`);
+            
+            await processDeliveries();
+    
+            await processTransfers()
+
+        }
+
         
         console.log('Import completed successfully');
-    // } catch (error) {
-    //     console.error(`Import process encountered errors but continued: ${error.message}`);
-    //     console.log('Import completed with some errors');
-    // }
 }
 
 module.exports = {
     run
 };
-
-
-let i = {
-    '1134': {
-        Paveco: {
-            20230613:{
-                items:{
-                    'BLZ-BLU8-24': 24
-                }
-            }
-        }
-    }
-}

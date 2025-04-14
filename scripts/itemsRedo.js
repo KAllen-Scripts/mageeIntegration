@@ -1351,7 +1351,7 @@ async function run() {
         console.timeEnd('Process Stock Attributes CSV');
 
         console.time('Process Images CSV');
-        await processImagesCSV();
+        // await processImagesCSV();
         console.timeEnd('Process Images CSV');
         
         console.time('Save Product Data');

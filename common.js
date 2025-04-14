@@ -101,7 +101,7 @@ async function postImage(imgURL) {
 
         const headers = { ...data.getHeaders() };
 
-        return requester('post', `https://${accountID}.webapp-${global.enviroment}/uploads`, data, undefined, headers);
+        return requester('post', `https://${accountID}.webapp-${global.enviroment}/uploads`, data, 5, headers);
     } catch (error) {
         console.error('Error posting image:', error.message);
         throw error;
