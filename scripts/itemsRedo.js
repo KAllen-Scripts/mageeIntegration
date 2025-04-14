@@ -811,8 +811,6 @@ async function processImagesCSV() {
         }
         
         console.log(`Built model lookup with ${Object.keys(stockIDLookup).length} unique model IDs`);
-        
-        let promiseArr = []
 
         const stream = fs.createReadStream(modelImagesFilePath)
             .pipe(fastcsv.parse({ headers: true, trim: true }))
@@ -823,37 +821,30 @@ async function processImagesCSV() {
             .on('data', async row => {
                 stream.pause();
 
-                promiseArr.push((async ()=>{
-                    totalCount++;
+                totalCount++;
+            
+                // Make sure we're accessing the ModelID field correctly
+                const modelId = row['Models_ModelID'];
                 
-                    // Make sure we're accessing the ModelID field correctly
-                    const modelId = row['Models_ModelID'];
+                if (modelId && stockIDLookup[modelId] && row['ImageURLs']) {
+                    const parent = stockIDLookup[modelId];
+                    const imageUrls = row['ImageURLs'].split(',');
                     
-                    if (modelId && stockIDLookup[modelId] && row['ImageURLs']) {
-                        const parent = stockIDLookup[modelId];
-                        const imageUrls = row['ImageURLs'].split(',');
-                        
-                        // Process each image URL for this model
-                        for (const imageUrl of imageUrls) {
-                            if (!imageList[imageUrl]){
-                                let newURL = await common.postImage(imageUrl).then(r=>{return r.data.location})
-                                imageList[imageUrl] - newURL
-                            }
-                            if(!productData[parent].images.includes(imageList[imageUrl])){productData[parent].images.push(imageList[imageUrl])}
+                    // Process each image URL for this model
+                    for (const imageUrl of imageUrls) {
+                        if (!imageList[imageUrl]){
+                            let newURL = await common.postImage(imageUrl).then(r=>{return r.data.location})
+                            imageList[imageUrl] - newURL
                         }
+                        if(!productData[parent].images.includes(imageList[imageUrl])){productData[parent].images.push(imageList[imageUrl])}
                     }
-                })())
-
-                if (promiseArr.length > 5){
-                    await Promise.all(promiseArr)
-                    promiseArr = []
                 }
+
                 
                 stream.resume();
             })
             .on('end', async () => {
                 try {
-                    await Promise.all(promiseArr)
                     resolve();
                 } catch (error) {
                     console.error('Error during image processing:', error);
@@ -1074,15 +1065,9 @@ async function makeItems() {
 
     console.log('Creating items from product data...');
     const createdItems = [];
-    
-    let promiseArr = []
 
     for (const parent of Object.keys(productData)) {
-        promiseArr.push(processItem(parent))
-        if (promiseArr.length >= 5){
-            await Promise.all(promiseArr)
-            promiseArr = []
-        }
+        processItem(parent)
     }
 
     fs.writeFileSync('./failed.txt', failedList.join('\n'), 'utf8');

@@ -109,10 +109,14 @@ async function postImage(imgURL) {
 }
 
 
-// All purpose requester function. Pass in a method, url, and data object. Waits for sleep function to resolve then returns a response from axios
+// All purpose requester function. Pass in a method, url, and data object
 const requester = async (method, url, data, attempt = 0, additionalHeaders, reAttempt = true) => {
 
     if(!accessToken.accessToken){await authenticate()}
+
+    if (Math.abs(new Date(accessToken.expiry).getTime() - new Date().getTime()) <= 2 * 60 * 1000) {
+        await getAdminToken()
+      }
 
     let headers = additionalHeaders || {'Content-Type': 'application/json'}
     headers.Authorization = 'Bearer ' + accessToken.accessToken
