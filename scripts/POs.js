@@ -556,8 +556,6 @@ async function makeOrders(orderNumberDebug = false) {
             const skuCodeCasePreserved = (useSKUArr.includes(item['rm type name']) ? item['sku code'] : item['rm name'])
             
             // Create or update item if it doesn't exist
-            console.log(skuCode)
-            await common.askQuestion(1)
             if (!items[skuCode]) {
                 const itemPayload = {
                     "isSold": true,
@@ -639,7 +637,7 @@ async function makeOrders(orderNumberDebug = false) {
             // Add item to purchase order with adjusted quantity and price
             const orderQuantity = parseFloatSafe(item['order quantity'], 2);
             const receivedQuantity = parseFloatSafe(item['order received quantity'], 2) || 0;
-            const quantityToUse = Math.max(orderQuantity, receivedQuantity);
+            const quantityToUse = round(Math.max(orderQuantity, receivedQuantity), 4);
             
             // Use the order price directly from the CSV and multiply by the appropriate quantity
             const unitPrice = parseFloatSafe(item['order price'], 6) || 0;
