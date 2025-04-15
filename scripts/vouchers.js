@@ -2,7 +2,7 @@ let common = require('../common.js');
 const fs = require('fs');
 const csv = require('fast-csv');
 process.chdir(__dirname);
-let vouchersFileName = '../files/saleorders/250218_FM Gift Vouchers outstanding as at 18.02.25.csv';
+let vouchersFileName = '../files - new/250218_FM Gift Vouchers outstanding as at 18.02.25.csv';
 
 async function makeVouchers(){
     return new Promise((res,rej)=>{
@@ -12,6 +12,7 @@ async function makeVouchers(){
         .on('data', async row => {
             stream.pause()
 
+            if (row.reference.trim() != '')
             try{
                 await common.requester('post', 'https://api.stok.ly/v0/credit-notes', {
                     "barcode": row['reference'],

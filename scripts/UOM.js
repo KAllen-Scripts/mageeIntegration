@@ -12,12 +12,15 @@ let suppliers = {};
 let costLookup = {};
 let itemTypes = {};
 
+let supplierCustom
+
 let multiplicationExceptions = ['Cloth', 'Fully Factored'];
-let altSKUExceptions = ['Button', 'Fully Factored']
+let altSKUExceptions = ['Button','Lining','Waistband/Pocket','Alcantara','Melton','Woven Label','Ticket/Story','Sundry']
 
 async function getSuppliers(){
     await common.loopThrough('Getting Suppliers', `https://${global.enviroment}/v1/suppliers`, 'size=1000', '[status]!={1}', (supp)=>{
         suppliers[supp.accountReference.toLowerCase().trim()] = supp.supplierId
+        if (supp.accountReference == 'CUST'){supplierCustom = supp.supplierId}
     })
 };
 
@@ -48,19 +51,22 @@ async function processRMCosts() {
                 })
                 .on('data', async row => {
                     stream.pause();
-
-                    console.log(row['Product Purchase Price'])
                     
-                    if (row['Product/RM Code'] && row['Colour Code'] && 
-                        row['Product/RM Code'] !== '' && row['Colour Code'] !== '' && 
-                        row['Product Purchase Price'] !== undefined) {
-                        
-                        costLookup[`${row['Product/RM Code']}-${row['Colour Code']}`] = row['Product Purchase Price'];
+                    let key = row['Product/RM Code'] || '';
+                    if (row['Colour Code'] && row['Colour Code'].trim() != '') {
+                        key += `-${row['Colour Code']}`;
+                    }
+                    if(row['Colour Code'] == ''){
+                        key += `-${row['Product/RM Code']}`
                     }
                     
+                    if (key && row['Product Purchase Price'] !== undefined) {
+                        costLookup[key] = parseFloat(row['Product Purchase Price']);
+                    }
+
                     stream.resume();
                 })
-                .on('end', () => {
+                .on('end', async () => {
                     resolve();
                 });
         });
@@ -89,10 +95,15 @@ async function processRMSKUCSV() {
                 .on('data', async row => {
                     stream.pause();
                     
-                    if (rawMaterials[row.SKU] == undefined){
+                    if (rawMaterials[row.SKU] == undefined) {
+                        let colorRef = row.RM || '';
+                        if (row['Colour Code']) {
+                            colorRef += `-${row['Colour Code']}`;
+                        }
+                        
                         rawMaterials[row.SKU] = {
                             potentialAltSku: row['RM Name'],
-                            colorRef: `${row.RM}-${row['Colour Code']}`
+                            colorRef: colorRef
                         }
                     }
                     
@@ -129,24 +140,33 @@ async function processRMData() {
                 .on('data', async row => {
                     stream.pause();
                     
-                    console.log(`${row['RM Code']}-${row['RM Colour Code']}`)
 
                     for (const RM of Object.keys(rawMaterials)){
-                        try{
-                            if (rawMaterials[RM].colorRef == `${row['RM Code']}-${row['RM Colour Code']}`){
-                                rawMaterials[RM].type = row['RM Type Description']
+                        try {
+                            let compareString = row['RM Code'] || '';
+                            if (row['RM Colour Code']) {
+                                compareString += `-${row['RM Colour Code']}`;
+                            }
+
+                            if (rawMaterials[RM].colorRef == compareString) {
+                                rawMaterials[RM].type = row['RM Type Description'];
+
+                                let amount = (multiplicationExceptions.includes(row['RM Type Description']) ? costLookup[`${row['RM Code']}-${row['RM Colour Code']}`] : costLookup[`${row['RM Code']}-${row['RM Colour Code']}`] * 100) || 0
+
+                                if (costLookup[`${row['RM Code']}-${row['RM Colour Code']}`] < 0.001){amount = 0}
+
                                 rawMaterials[RM].UOM = [
                                     {
-                                        "supplierId": suppliers[isNaN(parseInt(row['Preferred Supplier Code'])) ? row['Preferred Supplier Code'] : row['Preferred Supplier Code'].replace(/^0+/, '')],
+                                        "supplierId": suppliers[isNaN(parseInt(row['Preferred Supplier Code'])) ? row['Preferred Supplier Code'] : row['Preferred Supplier Code'].replace(/^0+/, '')] || supplierCustom,
                                         "supplierSku": altSKUExceptions.includes(row['RM Type Description']) ? RM : rawMaterials[RM].potentialAltSku,
                                         "cost": {
-                                            "amount": multiplicationExceptions.includes(row['RM Type Description']) ? RMCost[`${row['RM Code']}-${row['RM Colour Code']}`] : RMCost[`${row['RM Code']}-${row['RM Colour Code']}`] * 100,
+                                            "amount": parseFloat(amount.toFixed(2)),
                                             "currency": "GBP"
                                         },
                                         "currency": "GBP",
                                         "quantityInUnit": multiplicationExceptions.includes(row['RM Type Description']) ? 1 : 100
                                     }
-                                ]
+                                ];
                             }
                         } catch {}
                     }
@@ -173,24 +193,25 @@ async function makeRMs(){
             }
 
             console.log({
+                tags: ['RM'],
                 "format": 0,
                 "name": RM,
                 "sku": altSKUExceptions.includes(type) ? RM : rawMaterials[RM].potentialAltSku,
-                typeId: itemTypes[type],
+                typeId: itemTypes[type.toLowerCase().trim()],
                 unitsOfMeasure: rawMaterials[RM].UOM
             })
-
-            await common.askQuestion(1)
     
-            // await common.requester('post', `https://${global.enviroment}/v0/items`, {
-            //     "format": 0,
-            //     "name": RM,
-            //     "sku": altSKUExceptions.includes(type ? RM : rawMaterials[RM].potentialAltSku),
-            //     typeId: itemTypes[type],
-            //     unitsOfMeasure: rawMaterials[RM].UOM
-            // })
+            await common.requester('post', `https://${global.enviroment}/v0/items`, {
+                tags: ['RM'],
+                "format": 0,
+                "name": RM,
+                "sku": altSKUExceptions.includes(type) ? RM : rawMaterials[RM].potentialAltSku,
+                typeId: itemTypes[type.toLowerCase().trim()],
+                unitsOfMeasure: rawMaterials[RM].UOM
+            })
         } catch (e) {
             console.log(e)
+            // await common.askQuestion(1)
         }
 
 
@@ -207,8 +228,6 @@ async function run() {
     await processRMData()
 
     await makeRMs()
-
-    console.log(JSON.stringify(rawMaterials))
         
 }
 

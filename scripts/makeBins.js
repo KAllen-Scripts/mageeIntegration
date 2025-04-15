@@ -4,6 +4,8 @@ const csv = require('fast-csv');
 process.chdir(__dirname);
 let bins = '../files/stockStuff/barcode locations.csv';
 
+let locationId = '470de3f4-feeb-4a19-9b29-bce3a4218319'
+
 function generateRange(from, to) {
     // Handle invalid inputs
     if (!from || !to || typeof from !== 'string' || typeof to !== 'string') {
@@ -170,7 +172,7 @@ async function makeBins() {
                                 })
                             }
                         }
-                        if(binsLocations.bins.length > 0){await common.requester('patch', 'https://api.stok.ly/v0/locations/b98373ab-9d0b-46d3-974f-baf2d13a1a5d', binsLocations)}
+                        if(binsLocations.bins.length > 0){await common.requester('patch', `https://api.stok.ly/v0/locations/${locationId}`, binsLocations)}
                     }
 
 
@@ -186,7 +188,7 @@ async function makeBins() {
 
 let allBins = []
 async function run(){
-    await common.loopThrough('', `https://api.stok.ly/v0/locations/b98373ab-9d0b-46d3-974f-baf2d13a1a5d/bins`, `size=1000`, '[status]=={active}', (bin)=>{
+    await common.loopThrough('', `https://api.stok.ly/v0/locations/${locationId}/bins`, `size=1000`, '[status]=={active}', (bin)=>{
         allBins.push(bin.name.toLowerCase().trim())
     })
 

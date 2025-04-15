@@ -91,64 +91,61 @@ const FMSupplierLookupCSV = path.resolve(__dirname, '../files - new/FM-supplier-
 ///////////////////////////////////////////////////////////////////////////////////
 const childMappables = {
     FM: {
-        "ColourDesc\n(Ref 6)": '4c85f491-3de5-4114-af6d-c1ab7b870251',
-        'Brand': '3d9fd37a-60e5-4e4c-8c02-dc961b67de98',
-        "Season\n(Ref 1)": '13c4c99e-3565-4b4e-b3b0-25f6314f3955',
-        Department: '41b3e9fa-c636-41dc-b70c-deadddff6a40',
-        // "Fabric\n(Ref 2)": '48c313ae-38f0-482e-90d4-97d7758b840b' //tbd
+      'ColourDesc\n(Ref 6)': '3317d32a-3a8f-4a61-a14a-566edf56a470',
+      Brand: '72ab4034-3052-4604-b162-971bbe7910d2',
+      'Season\n(Ref 1)': '60c36253-f5de-415e-8512-9676bac7e4cc',
+      Department: '99d3a71c-aefc-4745-a534-9a4a4b34cb99'
     },
     Protex: {
-        'product search 1 description': '41b3e9fa-c636-41dc-b70c-deadddff6a40',
-        'product colour season/year': '13c4c99e-3565-4b4e-b3b0-25f6314f3955',
-        'Season/Year': '6ce894e8-8b34-4f3f-9f44-7d56f6cbb1e5',
-        'product search 2 description': '6b3daf6e-926d-4fb6-b548-2001ad352638',
-        'product colour search 1 description': 'c4ae0e48-15b6-48c6-8bc0-a8f797be7aef'
+      'product search 1 description': '99d3a71c-aefc-4745-a534-9a4a4b34cb99',
+      'product colour season/year': '60c36253-f5de-415e-8512-9676bac7e4cc',
+      'Season/Year': '9703945c-5e2e-4256-ab43-5f53cee8864b',
+      'product search 2 description': 'b7e3d108-5631-4d68-b575-6a8344ce4bc3',
+      'product colour search 1 description': '3e0b3ae5-eadd-4b68-9f9d-cda0535a8192'
     },
-    siteAttributes: {
-        "Colour": '4c85f491-3de5-4114-af6d-c1ab7b870251'
-    },
+    siteAttributes: { Colour: '3317d32a-3a8f-4a61-a14a-566edf56a470' },
     siteData: {
-        models_model: 'e575c574-cb5b-46f2-810f-58dfd8effaf0',
-        Models_AdditionalInformation1: '44585f6e-f8bc-419b-b193-f55ea0d1be9c',
-        Models_AdditionalInformation2: 'ba13a327-6706-4919-b4ab-7f9b35c518bc'
+      models_model: 'daba7868-59f7-4718-8030-c919f4a59c34',
+      Models_AdditionalInformation1: '02b2a667-a245-4dcf-bcf9-5b4b26f98176',
+      Models_AdditionalInformation2: '395c42b3-b2f7-4f51-a495-e7ed559b9873'
     }
-};
+  };
 
 const parentMappables = {
     FM: {
-        'retail price (inc vat)': 'a0602adc-4ab7-47b4-bb31-7ad3cba62814',
-        'uk wholesale (gbp) (exc vat) (user 3)': '09f44d56-55a3-460b-ab83-37ff57005259',
-        'eu wholesale (eur) (exc vat) (user 2)': 'dca6bffd-9a25-4686-b85c-b57e0a8a93f8',
-        "ColourDesc\n(Ref 6)": '4c85f491-3de5-4114-af6d-c1ab7b870251',
-        Colour: '9301312c-f71e-4216-a204-484f8e8f2d40',
-        'Brand': '3d9fd37a-60e5-4e4c-8c02-dc961b67de98',
-        "Season\n(Ref 1)": '13c4c99e-3565-4b4e-b3b0-25f6314f3955',
-        Department: '41b3e9fa-c636-41dc-b70c-deadddff6a40',
+      'retail price (inc vat)': '366aabba-ab23-41a6-abc5-9f8510ccf0a7',
+      'uk wholesale (gbp) (exc vat) (user 3)': '6759c0e7-af2f-4f7a-828c-1f4c8d8fffc9',
+      'eu wholesale (eur) (exc vat) (user 2)': '39098224-1ceb-4e7c-a357-b407eae40a76',
+      'ColourDesc\n(Ref 6)': '3317d32a-3a8f-4a61-a14a-566edf56a470',
+      Colour: '4beea84b-57ea-4e55-8ba1-8746c74e35b1',
+      Brand: '72ab4034-3052-4604-b162-971bbe7910d2',
+      'Season\n(Ref 1)': '60c36253-f5de-415e-8512-9676bac7e4cc',
+      Department: '99d3a71c-aefc-4745-a534-9a4a4b34cb99'
     },
     Protex: {
-        'product search 1 description': '41b3e9fa-c636-41dc-b70c-deadddff6a40',
-        'product colour season/year': '13c4c99e-3565-4b4e-b3b0-25f6314f3955',
-        'Season/Year': '6ce894e8-8b34-4f3f-9f44-7d56f6cbb1e5',
-        'product search 2 description': '6b3daf6e-926d-4fb6-b548-2001ad352638',
-        'product colour search 1 description': 'c4ae0e48-15b6-48c6-8bc0-a8f797be7aef',
-        'Product Colour Code': '9301312c-f71e-4216-a204-484f8e8f2d40'
+      'product search 1 description': '99d3a71c-aefc-4745-a534-9a4a4b34cb99',
+      'product colour season/year': '60c36253-f5de-415e-8512-9676bac7e4cc',
+      'Season/Year': '9703945c-5e2e-4256-ab43-5f53cee8864b',
+      'product search 2 description': 'b7e3d108-5631-4d68-b575-6a8344ce4bc3',
+      'product colour search 1 description': '3e0b3ae5-eadd-4b68-9f9d-cda0535a8192',
+      'Product Colour Code': '4beea84b-57ea-4e55-8ba1-8746c74e35b1'
     },
     siteAttributes: {
-        'pattern': '483f4af9-3e1d-4ceb-a82e-43710372ff3b',
-        'material': 'fc020182-7081-40e7-bae2-22ed017d58fd',
-        'style': '956c3d4d-8eac-4584-875c-b821e53af407',
-        "Colour": '4c85f491-3de5-4114-af6d-c1ab7b870251'
+      pattern: '68b6b4dc-8516-45c3-befe-840038c7c6ca',
+      material: 'e9501203-385e-4a63-b8d3-792760560945',
+      style: '83e1b674-4607-4af9-b5ac-cb81998261dc',
+      Colour: '3317d32a-3a8f-4a61-a14a-566edf56a470'
     },
     siteData: {
-        models_model: 'e575c574-cb5b-46f2-810f-58dfd8effaf0',
-        Models_AdditionalInformation1: '44585f6e-f8bc-419b-b193-f55ea0d1be9c',
-        Models_AdditionalInformation2: 'ba13a327-6706-4919-b4ab-7f9b35c518bc'
+      models_model: 'daba7868-59f7-4718-8030-c919f4a59c34',
+      Models_AdditionalInformation1: '02b2a667-a245-4dcf-bcf9-5b4b26f98176',
+      Models_AdditionalInformation2: '395c42b3-b2f7-4f51-a495-e7ed559b9873'
     }
-};
+  };
 
-const parentProductAttribute = '427c1dcb-9f3c-4acc-be4e-03dc3e7a8dc5';
-const sizeAttribute = '588ede69-9afa-4632-970d-d51b612eb5d5';
-const fitAttribute = 'aa261ded-5d0c-429f-99cd-bc5e2fd5d841';
+const parentProductAttribute = '52d10681-74a5-4269-9346-57cdc345dea5';
+const sizeAttribute = '6fa5e52c-d856-44a8-ae07-8ce40f5c4618';
+const fitAttribute = '208caa95-7ead-49ab-9818-6af5280bfdf1';
 ///////////////////////////////////////////////////////////////////////////////////
 
 
@@ -164,6 +161,7 @@ let itemTypes = {};
 let FMSupplierLookup = {};
 let suppliers = {};
 let supplierTempLookup = {};
+let barcodeTracker = [];
 
 
 //Will loop through these to remove fit letter from size, since the data is inconsistent
@@ -324,7 +322,7 @@ async function processProtexCSV() {
 
                     // Create the properly formatted variant key (ProductCode_ColorCode-SizeFit)
                     const formattedVariantKey = `${row['Product']}_${row['Colour Code']}-${row['Size'] || ''}${row['Fit'] ? row['Fit'].charAt(0) : ''}`;
-                    
+
                     // Use the formatted variant key as the primary key
                     if (!productData[productCode].variants[formattedVariantKey]) {
                         productData[productCode].variants[formattedVariantKey] = {
@@ -338,7 +336,10 @@ async function processProtexCSV() {
                     }
                     
                     // Add data
-                    if (ean) productData[productCode].variants[formattedVariantKey].barcodes.push(ean);
+                    if(!barcodeTracker.includes(ean)){
+                        if (ean) productData[productCode].variants[formattedVariantKey].barcodes.push(ean)
+                        barcodeTracker.push(ean)
+                    }
                     if (sku && sku !== formattedVariantKey) productData[productCode].variants[formattedVariantKey].altCodes.push(sku);
                     
                     // Add alt SKU format (with hyphen)
@@ -468,17 +469,25 @@ async function processFmCSV() {
                 const gtin1 = row['GTIN Barcode (H1)'] ? row['GTIN Barcode (H1)'].toString().trim() : '';
                 const gtin2 = row['GTIN Barcode (1)'] ? row['GTIN Barcode (1)'].toString().trim() : '';
                 
-                if (systemBarcode && !productData[productCode].variants[formattedVariantKey].barcodes.includes(systemBarcode)) {
-                    productData[productCode].variants[formattedVariantKey].barcodes.push(systemBarcode);
+                if(!barcodeTracker.includes(systemBarcode)){
+                    if (systemBarcode && !productData[productCode].variants[formattedVariantKey].barcodes.includes(systemBarcode)) {
+                        productData[productCode].variants[formattedVariantKey].barcodes.push(systemBarcode);
+                    }
+                    barcodeTracker.push(systemBarcode)
                 }
-                
-                if (gtin1 && !isNaN(gtin1) && !productData[productCode].variants[formattedVariantKey].barcodes.includes(gtin1)) {
-                    productData[productCode].variants[formattedVariantKey].barcodes.push(gtin1);
+
+                if(!barcodeTracker.includes(gtin1)){
+                    if (gtin1 && !isNaN(gtin1) && !productData[productCode].variants[formattedVariantKey].barcodes.includes(gtin1)) {
+                        productData[productCode].variants[formattedVariantKey].barcodes.push(gtin1);
+                    }
                 }
-                
-                if (gtin2 && !isNaN(gtin2) && !productData[productCode].variants[formattedVariantKey].barcodes.includes(gtin2)) {
-                    productData[productCode].variants[formattedVariantKey].barcodes.push(gtin2);
+
+                if(!barcodeTracker.includes(gtin2)){
+                    if (gtin2 && !isNaN(gtin2) && !productData[productCode].variants[formattedVariantKey].barcodes.includes(gtin2)) {
+                        productData[productCode].variants[formattedVariantKey].barcodes.push(gtin2);
+                    }
                 }
+
                 
                 // Add alternate SKU codes
                 const dashVariantKey = `${product}-${colorCode}-${sizeName}${fitChar}`;
@@ -1023,9 +1032,16 @@ async function makeItems() {
     console.log('Creating items from product data...');
     const createdItems = [];
 
+    let promiseArr = []
     for (const parent of Object.keys(productData)) {
-        await processItem(parent)
+        promiseArr.push(processItem(parent))
+        if (promiseArr.length >= 5){
+            await Promise.all(promiseArr)
+            promiseArr = []
+        }
     }
+
+    await Promise.all(promiseArr)
 
     fs.writeFileSync('./failed.txt', failedList.join('\n'), 'utf8');
 
@@ -1328,6 +1344,7 @@ async function run() {
         console.time('Process FM CSV');
         await processFmCSV();
         console.timeEnd('Process FM CSV');
+
         
         console.time('Process Protex Product CSV');
         await processProtexProductCSV();
@@ -1358,9 +1375,9 @@ async function run() {
         await saveDataToFile();
         console.timeEnd('Save Product Data');
 
-        console.time('Make Items');
+        // console.time('Make Items');
         await makeItems();
-        console.timeEnd('Make Items');
+        // console.timeEnd('Make Items');
         
         console.log('Product Data processing completed successfully');
     // } catch (error) {

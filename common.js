@@ -110,7 +110,7 @@ async function postImage(imgURL) {
 
 
 // All purpose requester function. Pass in a method, url, and data object
-const requester = async (method, url, data, attempt = 0, additionalHeaders, reAttempt = true) => {
+const requester = async (method, url, data, attempt = 3, additionalHeaders, reAttempt = false) => {
 
     if(!accessToken.accessToken){await authenticate()}
 
@@ -155,7 +155,7 @@ const requester = async (method, url, data, attempt = 0, additionalHeaders, reAt
             } else {
                 throw e
             }
-            await sleep(3000)
+            await sleep(6000)
             return requester(method, url, data, tryAgain)
         } else {
             // console.log(e)
