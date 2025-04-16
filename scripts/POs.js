@@ -20,10 +20,9 @@ let allDeliveries = [];
 let allTransfers = {};
 let transferArr = [];
 
-let existsingPOs = []
+let existsingPOs = {};
 
 const multiplicationExceptions = ['Cloth', 'Fully Factored']
-
 const altSKUExceptions = ['Button','Lining','Waistband/Pocket','Alcantara','Melton','Woven Label','Ticket/Story','Sundry']
 
 let logWrite = fs.createWriteStream('./PODebug.txt', {flags: 'a'})
@@ -102,7 +101,7 @@ function parseFloatSafe(value, decimals = 2) {
 }
 
 // Helper function to handle request failures with automatic retries
-async function safeRequest(method, url, data = undefined, maxRetries = 10, retryDelay = 1000) {
+async function safeRequest(method, url, data = undefined, maxRetries = 8, retryDelay = 1000) {
     let retries = 0;
     
     while (retries <= maxRetries) {
@@ -158,7 +157,7 @@ async function getAllSuppliers() {
 async function getAllPOs() {
     await common.loopThrough('Getting POs', `https://${global.enviroment}/v0/purchase-orders`, 'size=1000', '', (PO) => {
         try {
-            existsingPOs.push(PO.externalReference.split('||')[1].trim())
+            existsingPOs[PO.externalReference.split('||')[1].trim()] = PO.purchaseOrderId
         } catch (error) {}
     });
 }
@@ -340,7 +339,6 @@ async function getLocation(manufacturerName) {
 async function makeOrders(orderNumberDebug = false) {
     for (const orderNumber of Object.keys(saleOrders)) {
         try{
-            if(existsingPOs.includes(orderNumber)){continue}
             if (orderNumberDebug != false && orderNumber != orderNumberDebug){continue}
             const order = saleOrders[orderNumber];
             console.log(`Processing order ${orderNumber}...`);
@@ -553,8 +551,8 @@ async function makeOrders(orderNumberDebug = false) {
             
             // Process items for purchase order
             for (const item of order.items) {
-                const skuCode = (!altSKUExceptions.includes(item['rm type name']) ? item['sku code'] : item['rm name']).toLowerCase().trim()
-                const skuCodeCasePreserved = (!altSKUExceptions.includes(item['rm type name']) ? item['sku code'] : item['rm name'])
+                const skuCode = item['sku code'].toLowerCase().trim()
+                const skuCodeCasePreserved = (altSKUExceptions.includes(item['rm type name']) ? item['sku code'] : item['rm name'])
                 
                 // Create or update item if it doesn't exist
                 if (!items[skuCode]) {
@@ -585,7 +583,7 @@ async function makeOrders(orderNumberDebug = false) {
                     items[skuCode] = {
                         itemId: itemResponse.data.data.id,
                         name: item['sku code'],
-                        sku: skuCode
+                        sku: skuCodeCasePreserved
                     };
                 
                 }
@@ -608,7 +606,7 @@ async function makeOrders(orderNumberDebug = false) {
                 if (!unitOfMeasure) {
                     const uomPayload = {unitsOfMeasure:[{
                         "supplierId": supplierId,
-                        "supplierSku": skuCode,
+                        "supplierSku": skuCodeCasePreserved,
                         "cost": {
                             "amount": !multiplicationExceptions.includes(item['rm type name']) ? parseFloatSafe(item['order price'], 2) * 100 || 0 : (parseFloatSafe(item['order price'], 2) || 0),
                             "currency": order.currency
@@ -677,18 +675,35 @@ async function makeOrders(orderNumberDebug = false) {
                 if (allTransfers[orderNumber] == undefined){allTransfers[orderNumber] = {source: `${item['supplier name']} - ${item['supplier code']}`, destinations: {}}}
                 if (allTransfers[orderNumber].destinations[item[`warehouse name`]] == undefined){allTransfers[orderNumber].destinations[item[`warehouse name`]] = {}}
                 if (allTransfers[orderNumber].destinations[item[`warehouse name`]][item['delivery date']] == undefined){allTransfers[orderNumber].destinations[item[`warehouse name`]][item['delivery date']] = {}}
-                allTransfers[orderNumber].destinations[item[`warehouse name`]][item['delivery date']][items[(!altSKUExceptions.includes(item['rm type name']) ? item['sku code'] : item['rm name']).toLowerCase().trim()].itemId] = item['order received quantity']
+                allTransfers[orderNumber].destinations[item[`warehouse name`]][item['delivery date']][items[item['rm type name'].itemId]] = item['order received quantity']
             }
     
     
             logWrite.write(JSON.stringify(purchaseOrder) + '\r\n\r\n')
     
+            let purchaseOrderId
+            // if(Object.keys(existsingPOs).includes(orderNumber)){
+            //     purchaseOrderId = existsingPOs[orderNumber]
+            // } else {
+            //     // Create purchase order
+            //     const poResponse = await safeRequest('post', `https://${global.enviroment}/v0/purchase-orders`, purchaseOrder);
+            //     purchaseOrderId = poResponse.data.data.id;
+                
+                
+            //     await safeRequest('post', `https://${global.enviroment}/v0/purchase-orders/${purchaseOrderId}/approvals`, {"forced":false});
+            //     await safeRequest('post', `https://${global.enviroment}/v0/purchase-orders/${purchaseOrderId}/submissions`, {"forced":false});
+            // }
+
             // Create purchase order
             const poResponse = await safeRequest('post', `https://${global.enviroment}/v0/purchase-orders`, purchaseOrder);
-            const purchaseOrderId = poResponse.data.data.id;
+            purchaseOrderId = poResponse.data.data.id;
+            
             
             await safeRequest('post', `https://${global.enviroment}/v0/purchase-orders/${purchaseOrderId}/approvals`, {"forced":false});
             await safeRequest('post', `https://${global.enviroment}/v0/purchase-orders/${purchaseOrderId}/submissions`, {"forced":false});
+
+
+
             
             console.log(`Created purchase order for ${orderNumber}, ID: ${purchaseOrderId}`);
             

@@ -4,7 +4,7 @@ const csv = require('fast-csv');
 process.chdir(__dirname);
 let bins = '../files/stockStuff/barcode locations.csv';
 
-let locationId = '470de3f4-feeb-4a19-9b29-bce3a4218319'
+let locationId = '55c142b5-f047-441b-8b06-47df61f94b67'
 
 function generateRange(from, to) {
     // Handle invalid inputs

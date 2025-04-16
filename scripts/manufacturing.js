@@ -17,7 +17,7 @@ let manufacturingCosts = {}
 
 let receipts = [];
 
-let warehouseLocation = '470de3f4-feeb-4a19-9b29-bce3a4218319'
+let warehouseLocation = '55c142b5-f047-441b-8b06-47df61f94b67'
 
 async function getOrdersSheet(){
     return new Promise((res,rej)=>{
@@ -121,7 +121,7 @@ let problemOrders = []
 async function processOrders(){
     let orderArr = []
     for (const order in saleOrders){
-        if(!existingRuns.includes(order)){orderArr.push(saleOrders[order])}
+        orderArr.push(saleOrders[order])
     }
     orderArr.sort((a, b) => new Date(a.createdDate) - new Date(b.createdDate))
     
@@ -288,7 +288,7 @@ async function makeGoodsReceipts(){
     console.log(receipts)
     receipts.sort((a, b) => a.date - b.date);
     for (const receipt of receipts){
-        // try{
+        try{
             let receiptId;
             let makeReceiptAttemptsattempts = 0;
             const maxRetries = 10;
@@ -334,7 +334,7 @@ async function makeGoodsReceipts(){
                     await new Promise(resolve => setTimeout(resolve, 2000));
                 }
             }
-        // } catch {}
+        } catch {}
     }
 }
 
