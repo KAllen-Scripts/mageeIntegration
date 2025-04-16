@@ -101,7 +101,7 @@ function parseFloatSafe(value, decimals = 2) {
 }
 
 // Helper function to handle request failures with automatic retries
-async function safeRequest(method, url, data = undefined, maxRetries = 8, retryDelay = 1000) {
+async function safeRequest(method, url, data = undefined, maxRetries = 5, retryDelay = 1000) {
     let retries = 0;
     
     while (retries <= maxRetries) {
@@ -339,7 +339,7 @@ async function getLocation(manufacturerName) {
 async function makeOrders(orderNumberDebug = false) {
     for (const orderNumber of Object.keys(saleOrders)) {
         try{
-            if (orderNumberDebug != false && orderNumber != orderNumberDebug){continue}
+            if (orderNumberDebug != false && orderNumber == orderNumberDebug){continue}
             const order = saleOrders[orderNumber];
             console.log(`Processing order ${orderNumber}...`);
     
@@ -675,13 +675,14 @@ async function makeOrders(orderNumberDebug = false) {
                 if (allTransfers[orderNumber] == undefined){allTransfers[orderNumber] = {source: `${item['supplier name']} - ${item['supplier code']}`, destinations: {}}}
                 if (allTransfers[orderNumber].destinations[item[`warehouse name`]] == undefined){allTransfers[orderNumber].destinations[item[`warehouse name`]] = {}}
                 if (allTransfers[orderNumber].destinations[item[`warehouse name`]][item['delivery date']] == undefined){allTransfers[orderNumber].destinations[item[`warehouse name`]][item['delivery date']] = {}}
-                allTransfers[orderNumber].destinations[item[`warehouse name`]][item['delivery date']][items[item['rm type name'].itemId]] = item['order received quantity']
+                allTransfers[orderNumber].destinations[item[`warehouse name`]][item['delivery date']][items[item['sku code'].toLowerCase().trim()].itemId] = item['order received quantity']
+
             }
     
     
             logWrite.write(JSON.stringify(purchaseOrder) + '\r\n\r\n')
     
-            let purchaseOrderId
+            // let purchaseOrderId
             // if(Object.keys(existsingPOs).includes(orderNumber)){
             //     purchaseOrderId = existsingPOs[orderNumber]
             // } else {

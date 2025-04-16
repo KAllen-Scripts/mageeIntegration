@@ -89,7 +89,7 @@ let tempList = ['STTTRS_43633','STTTRS_62059','STTTRS_62060','STTTRS_62061','STT
 
 
 
-// //mageeStaging mappings
+// //magee mappings
 // ///////////////////////////////////////////////////////////////////////////////////
 // const childMappables = {
 //     FM: {
@@ -1096,6 +1096,32 @@ async function makeItems() {
         }
     }
 
+
+    for (const parent of Object.keys(productData)) {
+        const type = productData[parent].attributes?.FM?.['Type'];
+
+        if (type && itemTypes?.[type?.toLowerCase()?.trim()] == undefined){
+            try{
+                await common.requester('post', `https://${global.enviroment}/v0/item-types`, {"name":type}).then(r=>{
+                    itemTypes[type.toLowerCase().trim()] = r.data.data.id
+                })
+            } catch {console.log(type)}
+        }
+        for (const child of Object.keys(productData[parent].variants)){
+            const type = productData[parent].variants[child].attributes?.FM?.['Type'];
+            if (type && itemTypes?.[type?.toLowerCase()?.trim()] == undefined){
+                try{
+                    await common.requester('post', `https://${global.enviroment}/v0/item-types`, {"name":type}).then(r=>{
+                        itemTypes[type.toLowerCase.trim()] = r.data.data.id
+                    })
+                } catch {
+                    console.log(child)
+                    console.log(productData[parent].variants[child].attributes)
+                }
+            }
+        }
+    }
+
     console.log('Creating items from product data...');
     const createdItems = [];
 
@@ -1118,14 +1144,6 @@ async function makeItems() {
         try{
             console.log(`Processing parent product: ${parent}`);
             const parentProduct = productData[parent];
-
-
-            const type = parentProduct?.attributes?.FM?.['Type'];
-            if (!type || itemTypes?.[type.toLowerCase().trim()] == undefined){
-                await common.requester('post', `https://${global.enviroment}/v0/item-types`, {"name":parentProduct.attributes.FM['Type']}).then(r=>{
-                    itemTypes[parentProduct.attributes.FM['Type'].toLowerCase().trim()] = r.data.data.id
-                })
-            }
 
             // Check if sizeValue and fitValue vary across children
             const sizeValues = new Set();
@@ -1270,12 +1288,6 @@ async function makeItems() {
                             }
                         }
                     }
-                }
-                
-                if (itemTypes[variant.attributes.FM['Type'].toLowerCase().trim()] == undefined){
-                    await common.requester('post', `https://${global.enviroment}/v0/item-types`, {"name":variant.attributes.FM['Type']}).then(r=>{
-                        itemTypes[variant.attributes.FM['Type'].toLowerCase().trim()] = r.data.data.id
-                    })
                 }
 
                 // Create the child item data
