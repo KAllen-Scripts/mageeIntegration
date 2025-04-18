@@ -672,7 +672,7 @@ async function makeBoms(parentItemCode){
 
             }catch (e) {
                 console.log(e)
-                // await common.askQuestion()
+                await common.askQuestion()
             }
         }
     }

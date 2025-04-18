@@ -3,7 +3,7 @@ const convertCSV = require("json-2-csv");
 const fs = require('fs');
 const csv = require('fast-csv');
 process.chdir(__dirname);
-let manufacturingSheet = '../files - new/order/SO/SO_20241216155051.csv';
+let manufacturingSheet = '../files - new/order/SO/SO_20241216155051 - test2.csv';
 let supplierSheet = '../files - new/sage stuff/suppliers.csv';
 
 let items = {}
@@ -17,7 +17,7 @@ let manufacturingCosts = {}
 
 let receipts = [];
 
-let warehouseLocation = '55c142b5-f047-441b-8b06-47df61f94b67'
+let warehouseLocation = 'b98373ab-9d0b-46d3-974f-baf2d13a1a5d'
 
 async function getOrdersSheet(){
     return new Promise((res,rej)=>{
@@ -163,6 +163,9 @@ async function processOrders(){
                 })
             }
 
+            console.log(manufacturers[suppliers[order.customer].name.toLowerCase().trim() + ' - ' + suppliers[order.customer].code])
+            console.log(suppliers[order.customer].name.toLowerCase().trim() + ' - ' + suppliers[order.customer].code)
+            await common.askQuestion(1)
 
             if (manufacturers[suppliers[order.customer].name.toLowerCase().trim() + ' - ' + suppliers[order.customer].code] == undefined){
                 await common.requester('post', `https://api.stok.ly/v0/manufacturers`, {
@@ -192,7 +195,7 @@ async function processOrders(){
             let additionalCosts = []
 
             let orderJSON = {
-                "manufacturerId": manufacturers[order.supplier.toLowerCase().trim() + ' - ' + suppliers[order.customer].code],
+                "manufacturerId": manufacturers[suppliers[order.customer].name.toLowerCase().trim() + ' - ' + suppliers[order.customer].code],
                 "reference": `${order.ref} || ${order.number}`,
                 "manufacturingLocationId": locations[order.supplier.toLowerCase().trim() + ' - ' + suppliers[order.customer].code],
                 "deliveryLocationId": warehouseLocation,
@@ -260,25 +263,22 @@ async function processOrders(){
                     }
                 }
             }
-            if(!problemOrder){
-                try{
-                    let runId = await common.requester('post', `https://api.stok.ly/v0/manufacturing-runs`, {...orderJSON, additionalCosts}, 0).then(r=>{return r.data.data.id})
-                    for (const receipt of Object.keys(orderReceipts)){
-                        receipts.push({
-                            "locationId": warehouseLocation,
-                            "items": orderReceipts[receipt].items,
-                            "referenceType": 3,
-                            "referenceIds": [
-                                runId
-                            ],
-                            date: orderReceipts[receipt].date
-                        })
-                    }
-                } catch (err) {
-                    console.log(err)
+            try{
+                let runId = await common.requester('post', `https://api.stok.ly/v0/manufacturing-runs`, {...orderJSON, additionalCosts}, 0).then(r=>{return r.data.data.id})
+                for (const receipt of Object.keys(orderReceipts)){
+                    receipts.push({
+                        "locationId": warehouseLocation,
+                        "items": orderReceipts[receipt].items,
+                        "referenceType": 3,
+                        "referenceIds": [
+                            runId
+                        ],
+                        date: orderReceipts[receipt].date
+                    })
                 }
-            }else{
-                problemOrders.push(order.number)
+            } catch (err) {
+                console.log(err)
+                await common.askQuestion()
             }
         } catch{}
     }
@@ -348,7 +348,7 @@ async function run(){
     await getAllManufacturers();
     await getAllLocations();
     await processOrders();
-    await makeGoodsReceipts()
+    // await makeGoodsReceipts()
 
     console.log(problemOrders)
 }

@@ -13,10 +13,11 @@ let failedArr = [];
     // try{await require('./scripts/makeBins.js').run()}catch{failedArr.push('./scripts/makeBins.js')}
     // try{await require('./scripts/vouchers.js').run()}catch{failedArr.push('./scripts/vouchers.js')}
 
-    await require('./scripts/BOMS.js').run()
+    // await require('./scripts/BOMS.js').run()
     // try{await require('./scripts/itemsRedo.js').run()}catch{failedArr.push('./scripts/itemsRedo.js')}
     // try{await require('./scripts/BOMS.js').run()}catch{failedArr.push('./scripts/BOMS.js')}
-    // try{await require('./scripts/manufacturing.js').run()}catch{failedArr.push('./scripts/manufacturing.js')}
+    // await require('./scripts/manufacturing.js').run()
     
+    await require('./scripts/saleOrders2.js').run()
     
 })()
