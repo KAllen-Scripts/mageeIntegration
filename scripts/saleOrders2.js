@@ -62,16 +62,16 @@ async function getOrdersSheet(){
             stream.pause()
                 if (row['date'] != '' && !row['date'].includes('Total') && parseInt(row['qty sold']) > 0 && row['type'] != 'GV'){
                     
-                    if(saleOrders[row['date']+'a'] == undefined){
-                        saleOrders[row['date']+'a'] = {
+                    if(saleOrders[row['date']+'ann'] == undefined){
+                        saleOrders[row['date']+'ann'] = {
                             date: new Date(row['date'].replace(/(\d{2})\/(\d{2})\/(\d{4})/, '$3-$2-$1')).toISOString(),
                             location: 'f2b4d12d-684b-4fe5-97c8-56719bce5294',
                             channel: '53373b61-4ea5-44c4-9577-fd5780bb9475',
-                            barcode: row['date'] + '- 3',
+                            barcode: row['date'],
                             items:[],
                         }
                     }
-                    saleOrders[row['date']+'a'].items.push(row)
+                    saleOrders[row['date']+'ann'].items.push(row)
                 }
 
             stream.resume()

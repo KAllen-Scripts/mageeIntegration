@@ -157,7 +157,7 @@ async function processRMData() {
 
                                 rawMaterials[RM].UOM = [
                                     {
-                                        "supplierId": suppliers[isNaN(parseInt(row['Preferred Supplier Code'])) ? row['Preferred Supplier Code'] : row['Preferred Supplier Code'].replace(/^0+/, '')] || supplierCustom,
+                                        "supplierId": suppliers[isNaN(parseInt(row['Preferred Supplier Code'])) ? row['Preferred Supplier Code'].toLowerCase().trim() : row['Preferred Supplier Code'].replace(/^0+/, '')] || supplierCustom,
                                         "supplierSku": altSKUExceptions.includes(row['RM Type Description']) ? RM : rawMaterials[RM].potentialAltSku,
                                         "cost": {
                                             "amount": parseFloat(amount.toFixed(2)),
@@ -181,9 +181,10 @@ async function processRMData() {
     
 }
 
+let dupeList = []
 async function makeRMs(){
     for (const RM of Object.keys(rawMaterials)){
-
+        // if (RM != '62011-62011-STD'){continue}
         try{
             let type = rawMaterials[RM].type
             if (!type || itemTypes?.[type.toLowerCase().trim()] == undefined){
@@ -192,23 +193,35 @@ async function makeRMs(){
                 })
             }
 
+            let sku = (() => {
+                const itemToCheck = altSKUExceptions.includes(type) ? RM : rawMaterials[RM].potentialAltSku;
+                const occurrences = dupeList.filter(item => item === itemToCheck).length;
+                if (dupeList.includes(itemToCheck)) {
+                    return itemToCheck + ` - ${occurrences}`
+                }
+                return itemToCheck
+            })();
+
             console.log({
                 tags: ['RM'],
                 "format": 0,
                 "name": RM,
-                "sku": altSKUExceptions.includes(type) ? RM : rawMaterials[RM].potentialAltSku,
+                "sku": sku,
                 typeId: itemTypes[type.toLowerCase().trim()],
                 unitsOfMeasure: rawMaterials[RM].UOM
             })
     
+            dupeList.push(altSKUExceptions.includes(type) ? RM : rawMaterials[RM].potentialAltSku)
+
             await common.requester('post', `https://${global.enviroment}/v0/items`, {
                 tags: ['RM'],
                 "format": 0,
                 "name": RM,
-                "sku": altSKUExceptions.includes(type) ? RM : rawMaterials[RM].potentialAltSku,
+                "sku": sku,
                 typeId: itemTypes[type.toLowerCase().trim()],
                 unitsOfMeasure: rawMaterials[RM].UOM
             })
+
         } catch (e) {
             console.log(e)
             // await common.askQuestion(1)

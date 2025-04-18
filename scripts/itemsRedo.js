@@ -160,7 +160,8 @@ const childMappables = {
       'ColourDesc\n(Ref 6)': 'e22a53a8-e335-44f7-9d16-754fbb6e1759',
       Brand: '414a34df-4082-4d2a-bdbe-992601af0ee2',
       'Season\n(Ref 1)': 'bb187fc9-3cd9-4a5a-b526-c4a982063075',
-      Department: '2e21f1e5-7292-474e-a0da-1f71224e4f39'
+      Department: '2e21f1e5-7292-474e-a0da-1f71224e4f39',
+      'Colour Code': '1ac39d5c-4214-4260-a5d6-6c9c3859c668'
     },
     Protex: {
       'product search 1 description': '2e21f1e5-7292-474e-a0da-1f71224e4f39',
@@ -1128,7 +1129,7 @@ async function makeItems() {
     let promiseArr = []
     for (const parent of Object.keys(productData)) {
         promiseArr.push(processItem(parent))
-        if (promiseArr.length >= 5){
+        if (promiseArr.length >= 3){
             await Promise.all(promiseArr)
             promiseArr = []
         }
