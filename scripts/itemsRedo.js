@@ -231,6 +231,8 @@ let suppliers = {};
 let supplierTempLookup = {};
 let barcodeTracker = [];
 
+const createOnly = false;
+
 
 //Will loop through these to remove fit letter from size, since the data is inconsistent
 const fitLookup = {
@@ -242,6 +244,7 @@ const fitLookup = {
 };
 
 function getCountryCode(countryName) {
+    if(countryName == undefined){return}
         
     // Handle case-insensitive search
     const searchName = countryName.trim().toLowerCase();
@@ -320,7 +323,7 @@ async function getItems() {
         'size=1000&sortDirection=ASC&sortField=timeUpdated', 
         `[status]!={1}%26%26[timeUpdated]>>{${timeStamp}}`, 
         async (item) => {
-            itemList[item.sku.toLowerCase().trim().replaceAll(' ', '')] = item.itemId
+            itemList[item.sku.toLowerCase().trim()] = item.itemId
         }
     );
     
@@ -1129,7 +1132,7 @@ async function makeItems() {
     let promiseArr = []
     for (const parent of Object.keys(productData)) {
         promiseArr.push(processItem(parent))
-        if (promiseArr.length >= 3){
+        if (promiseArr.length >= (createOnly ? 1 : 3)){
             await Promise.all(promiseArr)
             promiseArr = []
         }
@@ -1211,7 +1214,7 @@ async function makeItems() {
                 "sku": parent,
                 "attributes": parentAttributes,
                 description: parentProduct?.attributes?.siteData?.['Models_Description'],
-                typeId: itemTypes[parentProduct.attributes.FM['Type'].toLowerCase().trim()],
+                typeId: itemTypes?.[parentProduct?.attributes?.FM?.['Type']?.toLowerCase()?.trim()],
                 "images": (()=>{
                     let returnArr = []
                     for (const image of (parentProduct.images || [])){
@@ -1298,12 +1301,13 @@ async function makeItems() {
                     "sku": Object.keys(parentProduct.variants).length > 1 ? child : parentProduct.singleItemSKU,
                     "barcodes": variant.barcodes || [],
                     "attributes": attributes,
-                    typeId: itemTypes[variant.attributes.FM['Type'].toLowerCase().trim()],
+                    typeId: itemTypes?.[variant?.attributes?.FM?.['Type']?.toLowerCase()?.trim()],
                     appendAttributes: true,
                     harmonyCode: variant?.attributes?.FM?.['Intrastat'],
                     countryOfOrigin: getCountryCode(variant?.attributes?.FM?.["COO\n(Ref 7)"])
                 };
                 try{childData.salePrice = {amount: parseFloat(((variant.attributes.FM['Retail Price\n(Inc Vat)'] / (1 + (parseFloat(variant.attributes.FM['Vat Rate']) / 100)))).toFixed(5)), currency: "GBP"}}catch{}
+                if (isNaN(childData.salePrice)){delete childData.salePrice}
 
                 try {
                     if(suppliers[FMSupplierLookup[variant?.attributes?.FM?.['Supplier'].toLowerCase().trim()]] != undefined && variant?.attributes?.FM?.['Cost'] != undefined){
@@ -1323,7 +1327,20 @@ async function makeItems() {
                 } catch {
 
                 }
-                let childId = await processChildItem(childData, variant, parent);
+                let childId
+                if (createOnly && itemList[childData.sku.toLowerCase().trim()]){
+                    childId = itemList[childData.sku.toLowerCase().trim()]
+                } else {
+                    try{
+                        childId = await processChildItem(childData, variant, parent);
+                    } catch (e) {
+                        childId = await common.requester('get', `https://api.stok.ly/v0/items?filter=[sku]=={@string;${childData.sku}}%26%26[status]!={1}`).then(r=>{
+                            return r.data.data[0].itemId
+                        })
+                        if(childId == undefined){throw e}
+                    }
+                    
+                }
                 parentData.variantItems.push(childId);
                 console.log(`Created child item: ${child}`);
             }
@@ -1332,11 +1349,33 @@ async function makeItems() {
                 return;
             }
             
-            await processParentItem(parentData, parentProduct);
-        } catch (e) {
-            failedList.push(parent)
-            console.log(e)
-        }
+            if (createOnly && !itemList[parentData.sku.toLowerCase().trim()]){
+                await processParentItem(parentData, parentProduct);
+            } else if (!createOnly) {
+                await processParentItem(parentData, parentProduct);
+            }
+
+            } catch (e) {
+                failedList.push(parent);
+                
+                console.error('Error processing item:', parent);
+                
+                // Check if it's an Axios error with response data
+                if (e.isAxiosError && e.response) {
+                    console.error('Status:', e.response.status);
+                    console.error('Status Text:', e.response.statusText);
+                    console.error('Response Data:', JSON.stringify(e.response.data, null, 2));
+                    console.error('Request URL:', e.config.url);
+                    console.error('Request Method:', e.config.method.toUpperCase());
+                    console.error('Request Data:', e.config.data, null, 2);
+                } else {
+                    // For non-Axios errors, log the full error
+                    console.error('Error:', e);
+                    console.error('Stack:', e.stack);
+                }
+                
+                await common.askQuestion(e);
+            }
     }
 }
 

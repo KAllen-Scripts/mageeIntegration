@@ -2,7 +2,7 @@ let common = require('../common.js');
 const fs = require('fs');
 const csv = require('fast-csv');
 process.chdir(__dirname);
-let vouchersFileName = '../files - new/250218_FM Gift Vouchers outstanding as at 18.02.25 - temp.csv';
+let vouchersFileName = '../files - new/250218_FM Gift Vouchers outstanding as at 18.02.25.csv';
 
 async function makeVouchers(){
     return new Promise((res,rej)=>{

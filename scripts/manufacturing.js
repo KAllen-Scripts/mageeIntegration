@@ -3,7 +3,7 @@ const convertCSV = require("json-2-csv");
 const fs = require('fs');
 const csv = require('fast-csv');
 process.chdir(__dirname);
-let manufacturingSheet = '../files - new/order/SO/SO_20241216155051 - test2.csv';
+let manufacturingSheet = '../files - new/order/SO/SO_20241216155051.csv';
 let supplierSheet = '../files - new/sage stuff/suppliers.csv';
 
 let items = {}
@@ -163,9 +163,6 @@ async function processOrders(){
                 })
             }
 
-            console.log(manufacturers[suppliers[order.customer].name.toLowerCase().trim() + ' - ' + suppliers[order.customer].code])
-            console.log(suppliers[order.customer].name.toLowerCase().trim() + ' - ' + suppliers[order.customer].code)
-            await common.askQuestion(1)
 
             if (manufacturers[suppliers[order.customer].name.toLowerCase().trim() + ' - ' + suppliers[order.customer].code] == undefined){
                 await common.requester('post', `https://api.stok.ly/v0/manufacturers`, {
@@ -278,7 +275,7 @@ async function processOrders(){
                 }
             } catch (err) {
                 console.log(err)
-                await common.askQuestion()
+                // await common.askQuestion()
             }
         } catch{}
     }
