@@ -12,30 +12,53 @@ let barcodeLookup = {};
 let nameLookup = {};
 
 let channelDetails = {
-    web: {
-        channel: 'e200bb42-2342-42b7-ab2f-91a5099f99a4',
-        sheet: '../files - new/retail orders/web.csv'
+	don: {
+        channel: 'aade0c0c-77bb-41d0-a9ce-a8a7eec791b6',
+        location: 'a74a39fe-9133-4dff-9522-a0c4e2526148',
+        sheet: '../files - new/retail orders/don.csv'
     },
     anns: {
         channel: '7895ece6-7fbc-4bce-a826-57aacb0abe78',
         location: '3ef8a574-19f2-4c6d-be2c-d68cb3fc97d9',
         sheet: '../files - new/retail orders/anns.csv'
     },
-    arnotts: {
+	web: {
+        channel: 'e200bb42-2342-42b7-ab2f-91a5099f99a4',
+        sheet: '../files - new/retail orders/web.csv'
+    },
+	arnotts: {
         channel: '51a8ab9f-0a37-479a-8991-4341075dec0f',
         location: 'aa383293-f340-4fc6-b021-9a3f7633d8a4',
         sheet: '../files - new/retail orders/arnotts.csv'
     },
-    shows: {
-        channel: '0518c5d1-7d77-4d10-a4e7-c7e851b704ff',
-        location: 'd9589ab8-f9e1-4b67-b90b-90c619a43fdf',
-        sheet: '../files - new/retail orders/shows.csv'
-    },
-    don: {
-        channel: 'aade0c0c-77bb-41d0-a9ce-a8a7eec791b6',
-        location: 'a74a39fe-9133-4dff-9522-a0c4e2526148',
-        sheet: '../files - new/retail orders/don.csv'
-    }
+    // shows: {
+    //     channel: '0518c5d1-7d77-4d10-a4e7-c7e851b704ff',
+    //     location: 'd9589ab8-f9e1-4b67-b90b-90c619a43fdf',
+    //     sheet: '../files - new/retail orders/shows.csv'
+    // }
+}
+
+const userMap = {
+	"4": "a5bd70d5-57ec-4882-9646-b5844f1353c5", // "Breda O",
+	"5": "a79f137e-5cf6-42b1-adc3-5c415a9411a4", // "Calum M",
+	"11": "ef7e867a-a063-4739-97cb-3fe6ed4262e0", // "Isobel S",
+	"14": "839d69b9-673d-4a4f-8389-3886f7435586", // "Kieran C",
+	"20": "6122c15a-993c-4c1a-9518-1143e93ab046", // "Ray H",
+	"23": "850e1e56-acdb-4764-8f13-f9f9432dbadd", // "Stephen H",
+	"24": "7f1afe3e-4457-4820-b457-74c647fd5247", // "Violet W",
+	"30": "c6ae56b5-5d31-40de-9750-93a38fb9ccac", // "Marie - Claire B",
+	"31": "52f9a864-6d51-48a8-90f4-b0a8392df850", // "Kayna M",
+	"33": "6a94f755-becd-477e-a697-23b5a40defbd", // "Graham H",
+	"34": "af46c640-cc9a-4799-a4c1-4ede7643a623", // "Martina K",
+	"39": "6fde85ab-e57e-4779-8098-149a7ebe577c", // "Ann Marie B",
+	"45": "3d52bffe-0491-4f18-bfc9-a49fdb28285f", // "Elle B",
+	"47": "4bda404b-3f89-4cc2-a04a-b03dbaf08a5a", // "Dallan M",
+	"51": "5725a341-d653-486d-891c-5ea9c60bb682", // "Ava A",
+	"59": "624613c9-2e48-4531-b0f1-4088721c1aad", // "Ciara T",
+	"63": "5c7b17d4-0672-4270-bc62-389f9e80ccd3", // "Ava M",
+	"64": "c66f64d9-52e3-454f-9d74-4ac6bc5f0db6", // "Abbie C",
+	"66": "0edf9c20-c4b4-47d6-8aff-e1eabde94ea2", // "Cezanne Mc",
+	"69": "88c1d5e5-0308-439d-a7a6-379942e5ff5b" // "Ciara GC"
 }
 
 async function getAllItems() {
@@ -78,6 +101,7 @@ async function getOrdersSheet(channel) {
                             location: channelDetails[channel].location,
                             channel: channelDetails[channel].channel,
                             barcode: row['date'] + channel + 'test4',
+							userId: lookupUser(row["operator"]),
                             items: [],
                         }
                     }
@@ -106,13 +130,12 @@ async function processOrders() {
             "sourceType": order.location == undefined ? 'magento_two' : 'epos',
             sourceId: order.channel,
             sourceReferenceId: order.location || order.barcode,
-            "currency": order.curency,
             barcode: order.barcode,
             "items": [],
-            currency: 'EUR',
+            currency: order.currency ?? 'EUR',
             "invoices": [{
                 "status": "paid",
-                "currency": order.currency,
+                "currency": order.currency ?? 'EUR',
                 "exchangeRate": 1,
                 "useSystemExchangeRate": false,
                 "payments": [{
@@ -122,7 +145,8 @@ async function processOrders() {
                 "items": []
             }],
             invoiced: true,
-            invoiceAll: true
+            invoiceAll: true,
+			userId: order.userId
         }
 
 
@@ -147,12 +171,12 @@ async function processOrders() {
 
             const referenceId = items[sku];
             const quantity = parseInt(item['qty sold'].replace(/,/g, ''));
-            const displayPrice = parseFloat((item['sell value'].replace(/,/g, '') / item['qty sold'].replace(/,/g, '')).toFixed(2));
+            const displayPrice = parseFloat((item['nett value'].replace(/,/g, '') / item['qty sold'].replace(/,/g, '')).toFixed(2));
             const displayTax = parseFloat((item['vat amount'].replace(/,/g, '') / item['qty sold'].replace(/,/g, '')).toFixed(2));
-            const displayLinePrice = parseFloat(item['sell value'].replace(/,/g, ''));
+            const displayLinePrice = parseFloat(item['nett value'].replace(/,/g, ''));
             const displayLineTax = parseFloat(item['vat amount'].replace(/,/g, ''));
             const displayLineDiscount = parseFloat(item['discount'].replace(/,/g, ''));
-            const displayLineTotal = parseFloat((displayLinePrice + displayLineTax).toFixed(2));
+            const displayLineTotal = parseFloat(item['sell value'].replace(/,/g, ''));
 
             // Check if item with this referenceId already exists in our map
             if (itemsMap[referenceId]) {
@@ -227,8 +251,11 @@ async function processOrders() {
 
     }
 
+}
 
-
+function lookupUser(operator) {
+	const operatorCode = operator.substring(0, 2)
+	return userMap[operatorCode]
 }
 
 async function run() {

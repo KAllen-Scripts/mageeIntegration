@@ -5,8 +5,8 @@ const csv = require('fast-csv');
 process.chdir(__dirname);
 
 let customerSheet = '../files/saleOrders/customers.csv';
-let ordersSheet = '../files - new/order/CO/CO_20241216155000.csv';
-const fmFilePath = '../files - new/FM/250225_FM Product Data - all skus 25.02.25.csv';
+let ordersSheet = '../files - new/order/CO/CO_2025051290010.csv';
+const fmFilePath = '../files - new/FM/250512_FM Product Data.csv';
 
 
 let customersFromSheet = {};

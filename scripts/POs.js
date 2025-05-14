@@ -5,8 +5,8 @@ process.chdir(__dirname);
 
 
 // Input files
-let customerSheet = '../files/manufacturing/suppliers.csv';
-let ordersSheet = '../files/purchaseOrders/RMPO_20241216155110.csv';
+let customerSheet = '../files - new/suppliers.csv';
+let ordersSheet = '../files - new/Order/RMPO/RMPO_2025051290013.csv';
 
 // Data storage
 let customersFromSheet = {};
@@ -209,7 +209,7 @@ async function getOrdersSheet() {
         
         // Track deliveries by date for closed items
         const deliveryDateItems = {};
-        
+
         fs.createReadStream(ordersSheet)
             .pipe(csv.parse({ headers: headers => headers.map(h => h.toLowerCase().trim()) }))
             .on('error', error => {

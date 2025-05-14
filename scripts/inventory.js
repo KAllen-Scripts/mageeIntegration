@@ -5,7 +5,8 @@ process.chdir(__dirname);
 
 
 // Input files
-let stockSheet = '../files - new/Retail shop stock by branch @ 27th March  2025 (2).csv';
+// let stockSheet = '../files - new/Clothing Retail branch stock @ 12th May 2025.csv';
+let stockSheet = '../files - new/Clothing warehouse stock @ 12th May 2025.csv';
 
 let stockList = {};
 let itemSkuList = {};

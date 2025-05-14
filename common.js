@@ -138,7 +138,7 @@ const requester = async (method, url, data, attempt = 3, additionalHeaders, reAt
     console.log(sendRequest)
 
     let returnVal = await axios(sendRequest).catch(async e=>{
-        remainingTokens = e.response.headers['x-ratelimit-remaining']
+        remainingTokens = e.response?.headers['x-ratelimit-remaining'] ?? remainingTokens
         if(e?.response?.data?.message == 'jwt expired' || e?.response?.data?.message == 'Invalid admin session'){
             if(authMethod){
                 await getAdminToken()

@@ -3,7 +3,7 @@ const convertCSV = require("json-2-csv");
 const fs = require('fs');
 const csv = require('fast-csv');
 process.chdir(__dirname);
-let manufacturingSheet = '../files - new/order/SO/SO_20241216155051.csv';
+let manufacturingSheet = '../files - new/order/SO/SO_2025051290012.csv';
 let supplierSheet = '../files - new/sage stuff/suppliers.csv';
 
 let items = {}
