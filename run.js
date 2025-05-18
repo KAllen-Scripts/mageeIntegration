@@ -11,6 +11,7 @@ let failedArr = [];
     // await require('./scripts/manufacturing.js').run()
 
     // await require('./scripts/saleOrders.js').run()
+    // await require('./scripts/saleOrders.js').run()
     // await require('./scripts/saleOrders2.js').run()
 
     // try { await require('./scripts/makeBins.js').run() } catch { failedArr.push('./scripts/makeBins.js') }
