@@ -26,6 +26,7 @@ let itemIDLookup = {};
 let itemListLookup = {};
 let additionalCosts = {};
 let existingBoms = [];
+const createOnly = false;
 
 const defaultTaxClass = 'c25a24dd-5ff3-43bf-be8c-348712dfc64d'
 
@@ -53,7 +54,6 @@ async function getProduct() {
                     
                     try {
                         const supplierCode = parseInt(row['preferred supplier code']);
-                        console.log(supplierCode);
                         
                         if (manufacturers[supplierCode] == undefined) {
                             let contacts = [];
@@ -293,11 +293,26 @@ async function getBomRawCosts() {
 async function getBomCosts() {
     // Get all files in the BOM costs folder
     const files = await fs.promises.readdir(bomCostsFolderPath);
-    const csvFiles = files.filter(file => file.toLowerCase().endsWith('.csv'));
+    
+    // Filter CSV files and sort them by date (most recent first)
+    // Assuming filename format: Cost_details_Additional_YYYYMMDDHHMMSS.csv
+    const csvFiles = files
+        .filter(file => file.toLowerCase().endsWith('.csv'))
+        .sort((a, b) => {
+            // Extract the timestamp part from filenames
+            const timestampA = a.match(/(\d{14})/)?.[1] || '';
+            const timestampB = b.match(/(\d{14})/)?.[1] || '';
+            // Sort in descending order (newest first)
+            return timestampB.localeCompare(timestampA);
+        });
     
     console.log(`Found ${csvFiles.length} BOM costs CSV files in ${bomCostsFolderPath}`);
     
-    // Process each file sequentially
+    // Object to store the most recent additional costs
+    // Structure: { productColorKey: { costName: {name, amount, type} } }
+    const latestAdditionalCosts = {};
+    
+    // Process each file sequentially, starting with the most recent
     for (const csvFile of csvFiles) {
         const BOMCosts = path.join(bomCostsFolderPath, csvFile);
         console.log(`Processing BOM costs file: ${csvFile}...`);
@@ -313,15 +328,23 @@ async function getBomCosts() {
                     stream.pause();
                     
                     try {
-                        if (additionalCosts[`${row['product/rm code']}_${row['colour code']}`] == undefined) {
-                            additionalCosts[`${row['product/rm code']}_${row['colour code']}`] = [];
+                        const productColorKey = `${row['product/rm code']}_${row['colour code']}`;
+                        const costName = row['additional cost name'];
+                        
+                        // Initialize the product/color entry if it doesn't exist
+                        if (!latestAdditionalCosts[productColorKey]) {
+                            latestAdditionalCosts[productColorKey] = {};
                         }
                         
-                        additionalCosts[`${row['product/rm code']}_${row['colour code']}`].push({
-                            name: row['additional cost name'],
-                            amount: row['value'],
-                            type: row.type
-                        });
+                        // Only add this cost if we haven't seen it before
+                        // (since we're processing from newest to oldest files)
+                        if (!latestAdditionalCosts[productColorKey][costName]) {
+                            latestAdditionalCosts[productColorKey][costName] = {
+                                name: costName,
+                                amount: row['value'],
+                                type: row.type
+                            };
+                        }
                     } catch (error) {
                         console.error(`Error processing row in ${csvFile}:`, error);
                     }
@@ -337,6 +360,13 @@ async function getBomCosts() {
     
     console.log('Finished processing all BOM costs files');
     
+    // Convert the nested object structure to the array format expected by the rest of the code
+    additionalCosts = {};
+    
+    for (const productColorKey in latestAdditionalCosts) {
+        additionalCosts[productColorKey] = Object.values(latestAdditionalCosts[productColorKey]);
+    }
+    
     // Calculate some statistics for logging
     let totalProductColorCombinations = Object.keys(additionalCosts).length;
     let totalAdditionalCosts = 0;
@@ -347,6 +377,8 @@ async function getBomCosts() {
     
     console.log(`Total unique product/color combinations with additional costs: ${totalProductColorCombinations}`);
     console.log(`Total additional cost entries: ${totalAdditionalCosts}`);
+    
+    return additionalCosts;
 }
 
 async function getBoms() {
@@ -379,7 +411,7 @@ async function getBoms() {
                     try {
                         if (BOMNumbers[row['product code']] && 
                             BOMNumbers[row['product code']][row['product colour code']] == row['bom code']) {
-                            
+
                             if (BOMS[`${row['product code']}`] == undefined) {
                                 BOMS[`${row['product code']}`] = {};
                             }
@@ -527,7 +559,7 @@ async function makeItemTypes(){
 }
 
 
-async function makeBoms(parentItemCode){
+async function makeBoms(){
 
     let promiseArr = []
     for (const BOM of Object.keys(BOMS)){
@@ -544,8 +576,7 @@ async function makeBoms(parentItemCode){
         for (const fabric of Object.keys(BOMS[BOM])){
             let updateParent = false
             if(itemList[`${BOM}_${fabric}`] == undefined){continue}
-            // if (`${BOM}_${fabric}` != parentItemCode){continue}
-            console.log(`${BOM}_${fabric}`)
+            if (`${BOM}_${fabric}` != 'LI2PC_43512'){continue}
             let templateList = []
             let billOfMaterialsTemplate = []
             try{
@@ -580,7 +611,7 @@ async function makeBoms(parentItemCode){
 
                 for (const item of itemList[`${BOM}_${fabric}`]){
 
-                    if(existingBoms.includes(item)){continue}
+                    if(existingBoms.includes(item) && createOnly){continue}
 
                     updateParent = true
 
@@ -597,6 +628,9 @@ async function makeBoms(parentItemCode){
                         }]
                     }
 
+                    console.log(additionalCosts[`${BOM}_${fabric}`])
+                    await common.askQuestion(1)
+
                     if (additionalCosts[`${BOM}_${fabric}`] != undefined){
                         for (const additional of additionalCosts[`${BOM}_${fabric}`]){
                             manufacturingCostsChild.push({
@@ -608,8 +642,13 @@ async function makeBoms(parentItemCode){
                                 "rate": 0,
                                 automaticallyIncludeOnManufacturingRuns: false
                             })
+                            console.log(manufacturingCostsChild)
+                            await common.askQuestion(2)
                         }
                     }
+
+                    console.log(manufacturingCostsChild)
+                    await common.askQuestion(3)
 
 
                     let bomList = []
@@ -632,6 +671,14 @@ async function makeBoms(parentItemCode){
         
                     }
         
+                    console.log({
+                        "acquisition": 2,
+                        "billOfMaterials": bomList,
+                        manufacturingCosts: manufacturingCostsChild
+                    })
+
+                    await common.askQuestion()
+
                     let attempts = 0;
                     const maxRetries = 5;
                     // while (attempts < maxRetries) {

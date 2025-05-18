@@ -11,6 +11,7 @@ let rawMaterials = {};
 let suppliers = {};
 let costLookup = {};
 let itemTypes = {};
+let itemList = {};
 
 let supplierCustom
 
@@ -29,6 +30,20 @@ async function getItemTypes(){
         itemTypes[type.name.toLowerCase().trim()] = type.itemTypeId
     })
 };
+
+async function getItems() {
+    
+    await common.loopThrough(
+        'Getting Items', 
+        `https://${global.enviroment}/v0/items`, 
+        'size=1000&sortDirection=ASC&sortField=timeUpdated', 
+        `[status]!={1}%26%26[tags]::{RM}`, 
+        async (item) => {
+            itemList[item.sku.toLowerCase().trim()] = item.itemId
+        }
+    );
+
+}
 
 async function processRMCosts() {
     // Get all CSV files in the folder
@@ -184,7 +199,7 @@ async function processRMData() {
 let dupeList = []
 async function makeRMs(){
     for (const RM of Object.keys(rawMaterials)){
-        // if (RM != '62011-62011-STD'){continue}
+        // if (RM != '80229-80229-STD'){continue}
         try{
             let type = rawMaterials[RM].type
             if (!type || itemTypes?.[type.toLowerCase().trim()] == undefined){
@@ -202,25 +217,37 @@ async function makeRMs(){
                 return itemToCheck
             })();
 
-            console.log({
-                tags: ['RM'],
-                "format": 0,
-                "name": RM,
-                "sku": sku,
-                typeId: itemTypes[type.toLowerCase().trim()],
-                unitsOfMeasure: rawMaterials[RM].UOM
-            })
+            // console.log({
+            //     tags: ['RM'],
+            //     "format": 0,
+            //     "name": RM,
+            //     "sku": sku,
+            //     typeId: itemTypes[type.toLowerCase().trim()],
+            //     unitsOfMeasure: rawMaterials[RM].UOM
+            // })
+
+            // console.log(rawMaterials[RM].UOM)
     
             dupeList.push(altSKUExceptions.includes(type) ? RM : rawMaterials[RM].potentialAltSku)
 
-            await common.requester('post', `https://${global.enviroment}/v0/items`, {
+            let item = {
                 tags: ['RM'],
                 "format": 0,
                 "name": RM,
                 "sku": sku,
                 typeId: itemTypes[type.toLowerCase().trim()],
                 unitsOfMeasure: rawMaterials[RM].UOM
-            })
+            }
+
+
+            let method = 'post'
+
+            if (itemList[sku.toLowerCase().trim()]){
+                item.unitsOfMeasure[0].unitOfMeasureId = await common.requester('get', `https://api.stok.ly/v0/items/${itemList[sku.toLowerCase().trim()]}/units-of-measure`).then(r=>{return r.data.data[0].unitOfMeasureId})
+                method = 'patch'
+            }
+
+            await common.requester(method, `https://${global.enviroment}/v0/items${method == 'patch' ? `/${itemList[sku.toLowerCase().trim()]}` : ''}`, item)
 
         } catch (e) {
             console.log(e)
@@ -234,6 +261,7 @@ async function makeRMs(){
 
 async function run() {
 
+    await getItems()
     await getItemTypes()
     await processRMCosts()
     await getSuppliers()
