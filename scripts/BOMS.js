@@ -256,6 +256,17 @@ async function getBomRawCosts() {
     
     console.log(`Found ${csvFiles.length} BOM raw costs CSV files in ${bomRawCostsFolderPath}`);
     
+    // Sort files by their timestamp (oldest first)
+    csvFiles.sort((a, b) => {
+        // Extract timestamps from filenames (assuming format Cost_YYYYMMDDHHMMSS)
+        const timestampA = a.split('_')[1].split('.')[0];
+        const timestampB = b.split('_')[1].split('.')[0];
+        
+        // Compare timestamps as strings (works for this format)
+        return timestampA.localeCompare(timestampB);
+    });
+    
+    
     // Process each file sequentially
     for (const csvFile of csvFiles) {
         const BOMRawCostsCSV = path.join(bomRawCostsFolderPath, csvFile);
@@ -749,6 +760,7 @@ function deduplicateLabels(template) {
   }
 
 async function run(){
+    await getBomRawCosts()
     await getAllManufacturers()
     await getCustomersSheet()
     await getProduct()
@@ -759,7 +771,6 @@ async function run(){
     await getAllVariables()
     await getAllTypes()
     await makeItemTypes()
-    await getBomRawCosts()
     await getBomCosts()
 
 

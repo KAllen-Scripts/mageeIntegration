@@ -23,9 +23,11 @@ let transferArr = [];
 let existsingPOs = {};
 
 const multiplicationExceptions = ['Cloth', 'Fully Factored']
-const altSKUExceptions = ['Button','Lining','Waistband/Pocket','Alcantara','Melton','Woven Label','Ticket/Story','Sundry']
+const altSKUExceptions = ['Button', 'Lining', 'Waistband/Pocket', 'Alcantara', 'Melton', 'Woven Label', 'Ticket/Story', 'Sundry']
 
-let logWrite = fs.createWriteStream('./PODebug.txt', {flags: 'a'})
+let logWrite = fs.createWriteStream('./PODebug.txt', {
+    flags: 'a'
+})
 
 // Standard VAT/sales tax rates
 let standardRates = {
@@ -103,26 +105,26 @@ function parseFloatSafe(value, decimals = 2) {
 // Helper function to handle request failures with automatic retries
 async function safeRequest(method, url, data = undefined, maxRetries = 5, retryDelay = 1000) {
     let retries = 0;
-    
+
     while (retries <= maxRetries) {
         try {
             if (retries > 0) {
                 console.log(`Retry attempt ${retries}/${maxRetries} for ${method.toUpperCase()} ${url}...`);
             }
-            
+
             return await common.requester(method, url, data);
         } catch (error) {
             retries++;
-            
+
             console.error(`==== REQUEST FAILED (Attempt ${retries}/${maxRetries}) ====`);
             console.error(`URL: ${url}`);
             console.error(`Method: ${method}`);
-            
+
             if (data) {
                 console.error("Request payload:");
                 console.error(JSON.stringify(data));
             }
-            
+
             if (error.response) {
                 console.error(`Status: ${error.response.status}`);
                 console.error("Response data:");
@@ -130,13 +132,13 @@ async function safeRequest(method, url, data = undefined, maxRetries = 5, retryD
             } else {
                 console.error(`Error: ${error.message}`);
             }
-            
+
             // If we've used all our retry attempts, throw the error instead of exiting
             if (retries > maxRetries) {
                 console.error(`All ${maxRetries} retry attempts failed.`);
                 throw new Error(`Request to ${url} failed after ${maxRetries} attempts: ${error.message}`);
             }
-            
+
             // Wait before retrying (with exponential backoff)
             const backoffTime = retryDelay * Math.pow(2, retries - 1);
             console.log(`Waiting ${backoffTime}ms before retry...`);
@@ -166,7 +168,9 @@ async function getAllPOs() {
 async function getAllLocations() {
     await common.loopThrough('Getting Locations', `https://${global.enviroment}/v0/locations`, 'size=1000', '[status]=={0}', async (location) => {
         locations[location.name.toLowerCase().trim()] = location.locationId;
-        try{locationLookup[location.name.split('-')[1].trim()] = location.locationId}catch{}
+        try {
+            locationLookup[location.name.split('-')[1].trim()] = location.locationId
+        } catch {}
     });
 }
 
@@ -186,7 +190,9 @@ async function getAllItems() {
 async function getCustomersSheet() {
     return new Promise((resolve, reject) => {
         fs.createReadStream(customerSheet)
-            .pipe(csv.parse({ headers: headers => headers.map(h => h.toLowerCase().trim()) }))
+            .pipe(csv.parse({
+                headers: headers => headers.map(h => h.toLowerCase().trim())
+            }))
             .on('error', error => {
                 console.error(`Error reading customer sheet: ${error.message}`);
                 process.exit(1);
@@ -201,121 +207,173 @@ async function getCustomersSheet() {
     });
 }
 
-// Read orders data from CSV
+
 async function getOrdersSheet() {
-    return new Promise((resolve, reject) => {
-        // Temporary storage for items by SKU before merging
-        const tempItems = {};
-        
-        // Track deliveries by date for closed items
-        const deliveryDateItems = {};
+    // Get all files in the orders folder
+    const ordersDir = path.dirname(ordersSheet);
+    const files = await fs.promises.readdir(ordersDir);
 
-        fs.createReadStream(ordersSheet)
-            .pipe(csv.parse({ headers: headers => headers.map(h => h.toLowerCase().trim()) }))
-            .on('error', error => {
-                console.error(`Error reading orders sheet: ${error.message}`);
-                process.exit(1);
-            })
-            .on('data', row => {
-                // Skip if the item is cancelled
-                if (row['colour order status']?.toLowerCase()?.trim() === 'cancelled') {
-                    return;
-                }
-                
-                const orderNumber = row['order number'];
-                const deliveryDate = row['delivery date'];
-                const skuCode = (row['sku code'] || '').toLowerCase().trim();
-                const isClosed = row['colour order status']?.toLowerCase()?.trim() === 'closed';
+    // Filter and sort files (newest first) - assuming filename contains date pattern
+    const orderFiles = files
+        .filter(file => file.toLowerCase().includes('orders') && file.toLowerCase().endsWith('.csv'))
+        .sort((a, b) => {
+            // Extract date patterns from filenames
+            const datePatternA = a.match(/(\d{8})|(\d{14})/)?.[0] || '';
+            const datePatternB = b.match(/(\d{8})|(\d{14})/)?.[0] || '';
+            // Sort in descending order (newest first)
+            return datePatternB.localeCompare(datePatternA);
+        });
 
-                // Initialize order if it doesn't exist
-                if (!saleOrders[orderNumber]) {
-                    saleOrders[orderNumber] = {
-                        supplier: parseInt(row['supplier code']),
-                        status: row['order status'],
-                        supplierName: row['supplier name'],
-                        manufacturer: row['warehouse name'],
-                        countryCode: row['country code'],
-                        date: new Date(row['order create date'].replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3')).toISOString(),
-                        items: [],
-                        type: row['order type name'],
-                        number: orderNumber,
-                        ref: row['order reference'],
-                        currency: row['order currency'],
-                        exampleBaseCurrency: parseFloatSafe(row['order value in base currency'], 6) || 0,
-                        exampleOrderCurrency: parseFloatSafe(row['order value in order currency'], 6) || 0,
-                        deliveries: {} // Track deliveries by date
-                    };
-                    
-                    // Initialize tempItems for this order
-                    tempItems[orderNumber] = {};
-                    
-                    // Initialize deliveryDateItems for this order
-                    deliveryDateItems[orderNumber] = {};
-                }
-                
-                // Check if the item exists in the system
-                const missing = !items[skuCode];
-                
-                // If the item is closed and has a delivery date, track it
-                if (isClosed && deliveryDate) {
-                    if (!deliveryDateItems[orderNumber][deliveryDate]) {
-                        deliveryDateItems[orderNumber][deliveryDate] = [];
+    console.log(`Found ${orderFiles.length} order files, processing from newest to oldest`);
+
+    // If no matching files found, fall back to the original file
+    if (orderFiles.length === 0) {
+        orderFiles.push(path.basename(ordersSheet));
+    }
+
+    // Set to track order numbers we've already processed
+    const processedOrderNumbers = new Set();
+
+    // Temporary storage for items by SKU before merging
+    const tempItems = {};
+
+    // Track deliveries by date for closed items
+    const deliveryDateItems = {};
+
+    // Process all files sequentially, starting with newest
+    for (let i = 0; i < orderFiles.length; i++) {
+        const currentOrdersFile = path.join(ordersDir, orderFiles[i]);
+        console.log(`Processing orders file: ${orderFiles[i]} (${i+1}/${orderFiles.length})`);
+
+        await new Promise((resolve, reject) => {
+            fs.createReadStream(currentOrdersFile)
+                .pipe(csv.parse({
+                    headers: headers => headers.map(h => h.toLowerCase().trim())
+                }))
+                .on('error', error => {
+                    console.error(`Error reading orders file ${orderFiles[i]}: ${error.message}`);
+                    resolve(); // Continue to next file even if there's an error
+                })
+                .on('data', row => {
+                    // Skip if the item is cancelled
+                    if (row['colour order status']?.toLowerCase()?.trim() === 'cancelled') {
+                        return;
                     }
-                    
-                    // Add this delivery record
-                    deliveryDateItems[orderNumber][deliveryDate].push({
-                        skuCode,
-                        rmName: row['rm name'],
-                        quantity: parseFloatSafe(row['order received quantity'], 2) || 0,
-                        itemDetails: { ...row }
-                    });
-                }
-                
-                // Use SKU code as a key to merge items
-                if (!tempItems[orderNumber][skuCode]) {
-                    tempItems[orderNumber][skuCode] = { 
-                        ...row, 
-                        missing,
-                        'order quantity': parseFloatSafe(row['order quantity'], 2) || 0,
-                        'order value in order currency': parseFloatSafe(row['order value in order currency'], 2) || 0,
-                        'order value in base currency': parseFloatSafe(row['order value in base currency'], 2) || 0,
-                        'order received quantity': parseFloatSafe(row['order received quantity'], 2) || 0
-                    };
-                } else {
-                    // Merge by adding quantities and values with careful rounding
-                    tempItems[orderNumber][skuCode]['order quantity'] = round(
-                        tempItems[orderNumber][skuCode]['order quantity'] + parseFloatSafe(row['order quantity'], 2), 2
-                    );
-                    tempItems[orderNumber][skuCode]['order value in order currency'] = round(
-                        tempItems[orderNumber][skuCode]['order value in order currency'] + parseFloatSafe(row['order value in order currency'], 2), 2
-                    );
-                    tempItems[orderNumber][skuCode]['order value in base currency'] = round(
-                        tempItems[orderNumber][skuCode]['order value in base currency'] + parseFloatSafe(row['order value in base currency'], 2), 2
-                    );
-                    tempItems[orderNumber][skuCode]['order received quantity'] = round(
-                        tempItems[orderNumber][skuCode]['order received quantity'] + parseFloatSafe(row['order received quantity'], 2), 2
-                    );
-                }
-            })
-            .on('end', () => {
-                // Transfer merged items to the saleOrders
-                for (const orderNumber in tempItems) {
-                    for (const skuCode in tempItems[orderNumber]) {
-                        saleOrders[orderNumber].items.push(tempItems[orderNumber][skuCode]);
+
+                    const orderNumber = row['order number'];
+
+                    // Skip this entire order if we've already processed it in a newer file
+                    if (processedOrderNumbers.has(orderNumber)) {
+                        return;
                     }
-                    
-                    // Transfer delivery date information
-                    saleOrders[orderNumber].deliveries = deliveryDateItems[orderNumber];
-                }
-                resolve();
-            });
-    });
+
+                    const deliveryDate = row['delivery date'];
+                    const skuCode = (row['sku code'] || '').toLowerCase().trim();
+                    const isClosed = row['colour order status']?.toLowerCase()?.trim() === 'closed';
+
+                    // Initialize order if it doesn't exist
+                    if (!saleOrders[orderNumber]) {
+                        saleOrders[orderNumber] = {
+                            supplier: parseInt(row['supplier code']),
+                            status: row['order status'],
+                            supplierName: row['supplier name'],
+                            manufacturer: row['warehouse name'],
+                            countryCode: row['country code'],
+                            date: new Date(row['order create date'].replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3')).toISOString(),
+                            items: [],
+                            type: row['order type name'],
+                            number: orderNumber,
+                            ref: row['order reference'],
+                            currency: row['order currency'],
+                            exampleBaseCurrency: parseFloatSafe(row['order value in base currency'], 6) || 0,
+                            exampleOrderCurrency: parseFloatSafe(row['order value in order currency'], 6) || 0,
+                            deliveries: {} // Track deliveries by date
+                        };
+
+                        // Initialize tempItems for this order
+                        tempItems[orderNumber] = {};
+
+                        // Initialize deliveryDateItems for this order
+                        deliveryDateItems[orderNumber] = {};
+                    }
+
+                    // Check if the item exists in the system
+                    const missing = !items[skuCode];
+
+                    // If the item is closed and has a delivery date, track it
+                    if (isClosed && deliveryDate) {
+                        if (!deliveryDateItems[orderNumber][deliveryDate]) {
+                            deliveryDateItems[orderNumber][deliveryDate] = [];
+                        }
+
+                        // Add this delivery record
+                        deliveryDateItems[orderNumber][deliveryDate].push({
+                            skuCode,
+                            rmName: row['rm name'],
+                            quantity: parseFloatSafe(row['order received quantity'], 2) || 0,
+                            itemDetails: {
+                                ...row
+                            }
+                        });
+                    }
+
+                    // Use SKU code as a key to merge items
+                    if (!tempItems[orderNumber][skuCode]) {
+                        tempItems[orderNumber][skuCode] = {
+                            ...row,
+                            missing,
+                            'order quantity': parseFloatSafe(row['order quantity'], 2) || 0,
+                            'order value in order currency': parseFloatSafe(row['order value in order currency'], 2) || 0,
+                            'order value in base currency': parseFloatSafe(row['order value in base currency'], 2) || 0,
+                            'order received quantity': parseFloatSafe(row['order received quantity'], 2) || 0
+                        };
+                    } else {
+                        // Merge by adding quantities and values with careful rounding
+                        tempItems[orderNumber][skuCode]['order quantity'] = round(
+                            tempItems[orderNumber][skuCode]['order quantity'] + parseFloatSafe(row['order quantity'], 2), 2
+                        );
+                        tempItems[orderNumber][skuCode]['order value in order currency'] = round(
+                            tempItems[orderNumber][skuCode]['order value in order currency'] + parseFloatSafe(row['order value in order currency'], 2), 2
+                        );
+                        tempItems[orderNumber][skuCode]['order value in base currency'] = round(
+                            tempItems[orderNumber][skuCode]['order value in base currency'] + parseFloatSafe(row['order value in base currency'], 2), 2
+                        );
+                        tempItems[orderNumber][skuCode]['order received quantity'] = round(
+                            tempItems[orderNumber][skuCode]['order received quantity'] + parseFloatSafe(row['order received quantity'], 2), 2
+                        );
+                    }
+                })
+                .on('end', () => {
+                    // After processing this file, mark all encountered order numbers as processed
+                    for (const orderNumber in tempItems) {
+                        processedOrderNumbers.add(orderNumber);
+                    }
+
+                    resolve();
+                });
+        });
+    }
+
+    // After all files are processed, transfer merged items to the saleOrders
+    for (const orderNumber in tempItems) {
+        for (const skuCode in tempItems[orderNumber]) {
+            saleOrders[orderNumber].items.push(tempItems[orderNumber][skuCode]);
+        }
+
+        // Transfer delivery date information
+        saleOrders[orderNumber].deliveries = deliveryDateItems[orderNumber];
+    }
+
+    console.log(`Total unique orders processed: ${processedOrderNumbers.size}`);
+    return Promise.resolve();
 }
 
 
 async function getLocation(manufacturerName) {
-    for (const location in locations){
-        if (location.toLowerCase().trim().includes(manufacturerName.toLowerCase().trim())){return locations[location]}
+    for (const location in locations) {
+        if (location.toLowerCase().trim().includes(manufacturerName.toLowerCase().trim())) {
+            return locations[location]
+        }
     }
     console.log('///////////////////////////////////////////////////////////////////////////////////\n\nNUMBER 2 \n\n///////////////////////////////////////////////////////////////////////////////////')
     return safeRequest('post', `https://${global.enviroment}/v0/locations`, {
@@ -329,7 +387,7 @@ async function getLocation(manufacturerName) {
             "region": ""
         },
         "contacts": []
-    }).then(r=>{
+    }).then(r => {
         locations[manufacturerName.toLowerCase().trim()] = r.data.data.id
         return r.data.data.id
     })
@@ -338,20 +396,22 @@ async function getLocation(manufacturerName) {
 
 async function makeOrders(orderNumberDebug = false) {
     for (const orderNumber of Object.keys(saleOrders)) {
-        try{
-            if (orderNumberDebug != false && orderNumber == orderNumberDebug){continue}
+        try {
+            if (orderNumberDebug != false && orderNumber == orderNumberDebug) {
+                continue
+            }
             const order = saleOrders[orderNumber];
             console.log(`Processing order ${orderNumber}...`);
-    
+
             let locationId = locationLookup[order.supplier]
             let locationContactId
-    
-            if (locationId == undefined){
-    
+
+            if (locationId == undefined) {
+
                 let locationName = `${order.supplierName} - ${order.supplier}`
-    
+
                 console.log('///////////////////////////////////////////////////////////////////////////////////\n\nNUMBER 1 \n\n///////////////////////////////////////////////////////////////////////////////////')
-    
+
                 await common.requester('post', `https://${global.enviroment}/v0/locations`, {
                     "name": locationName,
                     "address": {
@@ -361,31 +421,29 @@ async function makeOrders(orderNumberDebug = false) {
                         "postcode": "XXX XXX",
                         "region": ""
                     },
-                    "contacts": [
-                        {
+                    "contacts": [{
+                        "forename": "contact",
+                        "surname": "",
+                        "email": "contact@contact.com",
+                        "tags": [
+                            "Delivery Contact"
+                        ],
+                        "name": {
                             "forename": "contact",
-                            "surname": "",
-                            "email": "contact@contact.com",
-                            "tags": [
-                                "Delivery Contact"
-                            ],
-                            "name": {
-                                "forename": "contact",
-                                "surname": ""
-                            }
+                            "surname": ""
                         }
-                    ]
-                }).then(async r=>{
+                    }]
+                }).then(async r => {
                     locationLookup[order.supplier] = r.data.data.id
                     locationId = r.data.data.id
                     locations[locationName.toLowerCase().trim()] = r.data.data.id
-    
+
                     let attempts = 0;
-    
+
                     while (locationContactId === undefined && attempts < 100) {
                         const contactResponse = await safeRequest('get', `https://${global.enviroment}/v0/locations/${locationId}/contacts`);
                         locationContactId = contactResponse?.data?.data?.[0]?.contactId;
-                        
+
                         if (locationContactId === undefined) {
                             attempts++;
                             await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 1 second before retry
@@ -393,65 +451,63 @@ async function makeOrders(orderNumberDebug = false) {
                     }
                 })
             }
-    
+
             let attempts = 0;
             while (locationContactId === undefined && attempts < 1000) {
                 const contactResponse = await safeRequest('get', `https://${global.enviroment}/v0/locations/${locationId}/contacts`);
                 locationContactId = contactResponse?.data?.data?.[0]?.contactId;
-                
+
                 if (locationContactId === undefined) {
                     attempts++;
                     await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 1 second before retry
                 }
             }
-    
-            if(locationContactId == undefined){
+
+            if (locationContactId == undefined) {
                 await safeRequest('patch', `https://${global.enviroment}/v0/locations/${locationId}`, {
-                    "contacts": [
-                        {
+                    "contacts": [{
+                        "forename": "contact",
+                        "surname": "",
+                        "email": "contact@contact.com",
+                        "tags": [
+                            "Delivery Contact"
+                        ],
+                        "name": {
                             "forename": "contact",
-                            "surname": "",
-                            "email": "contact@contact.com",
-                            "tags": [
-                                "Delivery Contact"
-                            ],
-                            "name": {
-                                "forename": "contact",
-                                "surname": ""
-                            }
+                            "surname": ""
                         }
-                    ]
+                    }]
                 });
                 let attempts = 0;
                 while (locationContactId === undefined && attempts < 1000) {
                     const contactResponse = await safeRequest('get', `https://${global.enviroment}/v0/locations/${locationId}/contacts`);
                     locationContactId = contactResponse?.data?.data?.[0]?.contactId;
-                    
+
                     if (locationContactId === undefined) {
                         attempts++;
                         await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 1 second before retry
                     }
                 }
             }
-    
-    
+
+
             // Create or update supplier
             const supplierMethod = suppliers[order.supplier] ? 'patch' : 'post';
             const supplierEndpoint = `https://${global.enviroment}/v1/suppliers${supplierMethod === 'patch' ? '/' + suppliers[order.supplier] : ''}`;
-            
+
             const customerData = customersFromSheet[order.supplier] || {};
             const supplierName = customerData.name || order.supplierName || `Supplier ${order.supplier}`;
             const countryCode = customerData['country code'] || order.countryCode || 'GB';
-    
+
             let supplierContactId;
             let supplierId = suppliers[order.supplier];
-    
+
             // Get supplier contact if supplier exists
             if (supplierId) {
                 const contactResponse = await safeRequest('get', `https://${global.enviroment}/v1/suppliers/${supplierId}/contacts`);
                 supplierContactId = contactResponse.data.data[0]?.contactId;
             }
-    
+
             if (!supplierId || supplierContactId == undefined) {
                 // Create supplier payload
                 const supplierPayload = {
@@ -472,40 +528,38 @@ async function makeOrders(orderNumberDebug = false) {
                         "postcode": "undefined"
                     },
                     "currency": customerData.currency || order.currency,
-                    "contacts": [
-                        {
+                    "contacts": [{
+                        "forename": supplierName,
+                        "surname": "",
+                        "email": customerData['contact email'] || 'default@default.com',
+                        "phone": customerData['contact telephone'] || '121212121212',
+                        "tags": ["Delivery Contact"],
+                        "name": {
                             "forename": supplierName,
-                            "surname": "",
-                            "email": customerData['contact email'] || 'default@default.com',
-                            "phone": customerData['contact telephone'] || '121212121212',
-                            "tags": ["Delivery Contact"],
-                            "name": {
-                                "forename": supplierName,
-                                "surname": ""
-                            }
+                            "surname": ""
                         }
-                    ]
+                    }]
                 };
-                
+
                 // Create or update supplier and get ID
                 const supplierResponse = await safeRequest(supplierMethod, supplierEndpoint, supplierPayload);
                 await common.sleep(200);
                 supplierId = supplierResponse.data.data.id;
                 suppliers[order.supplier] = supplierResponse.data.data.id;
-                
+
                 let attempts = 0;
-                
+
                 while (supplierContactId === undefined && attempts < 5) {
-                  const contactResponse = await safeRequest('get', `https://${global.enviroment}/v1/suppliers/${supplierId}/contacts`);
-                  supplierContactId = contactResponse.data.data[0]?.contactId;
-                  
-                  if (supplierContactId === undefined) {
-                    attempts++;
-                    await new Promise(resolve => setTimeout(resolve, 2000));
-                  }
+                    const contactResponse = await safeRequest('get', `https://${global.enviroment}/v1/suppliers/${supplierId}/contacts`);
+                    supplierContactId = contactResponse.data.data[0]?.contactId;
+
+                    if (supplierContactId === undefined) {
+                        attempts++;
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                    }
                 }
             }
-    
+
             // Create purchase order object
             let exchangeRate;
             if (order.exampleBaseCurrency && order.exampleOrderCurrency && order.exampleOrderCurrency !== 0) {
@@ -514,9 +568,9 @@ async function makeOrders(orderNumberDebug = false) {
             } else {
                 exchangeRate = "1.000000";
             }
-    
+
             const exchangeRateFloat = parseFloat(exchangeRate);
-                
+
             const purchaseOrder = {
                 "currency": order.currency,
                 "items": [],
@@ -533,11 +587,11 @@ async function makeOrders(orderNumberDebug = false) {
                 "exchangeRate": exchangeRateFloat,
                 externalReference: order.ref + " || " + orderNumber
             };
-            
+
             // Calculate tax modifier
             let taxMod = 1.23; // Default 23% tax
             const country = customerData['country code'] || order.countryCode || 'GB';
-            
+
             if (country === 'US') {
                 const city = customerData['city'] || '';
                 if (standardRates.US[city]) {
@@ -548,12 +602,12 @@ async function makeOrders(orderNumberDebug = false) {
             } else if (standardRates[country]) {
                 taxMod = 1 + (standardRates[country] / 100);
             }
-            
+
             // Process items for purchase order
             for (const item of order.items) {
                 const skuCode = item['sku code'].toLowerCase().trim()
                 const skuCodeCasePreserved = (altSKUExceptions.includes(item['rm type name']) ? item['sku code'] : item['rm name'])
-                
+
                 // Create or update item if it doesn't exist
                 if (!items[skuCode]) {
                     const itemPayload = {
@@ -562,91 +616,91 @@ async function makeOrders(orderNumberDebug = false) {
                         "format": 0,
                         "name": item['sku code'],
                         "sku": skuCodeCasePreserved,
-                        "unitsOfMeasure": [
-                            {
-                                "supplierId": supplierId,
-                                "supplierSku": skuCodeCasePreserved,
-                                "cost": {
-                                    "amount": !multiplicationExceptions.includes(item['rm type name']) ? parseFloatSafe(item['order price'], 2) * 100 || 0 : (parseFloatSafe(item['order price'], 2) || 0),
-                                    "currency": order.currency
-                                },
-                                "currency": order.currency,
-                                "quantityInUnit": !multiplicationExceptions.includes(item['rm type name']) ? 100 : 1
-                            }
-                        ]
+                        "unitsOfMeasure": [{
+                            "supplierId": supplierId,
+                            "supplierSku": skuCodeCasePreserved,
+                            "cost": {
+                                "amount": !multiplicationExceptions.includes(item['rm type name']) ? parseFloatSafe(item['order price'], 2) * 100 || 0 : (parseFloatSafe(item['order price'], 2) || 0),
+                                "currency": order.currency
+                            },
+                            "currency": order.currency,
+                            "quantityInUnit": !multiplicationExceptions.includes(item['rm type name']) ? 100 : 1
+                        }]
                     };
-                    
+
                     console.log(`Creating new item: ${skuCode}`);
                     const itemResponse = await safeRequest('post', `https://${global.enviroment}/v0/items`, itemPayload);
-                    
+
                     // Save item information
                     items[skuCode] = {
                         itemId: itemResponse.data.data.id,
                         name: item['sku code'],
                         sku: skuCodeCasePreserved
                     };
-                
+
                 }
-                
+
                 // Get unit of measure
                 let unitOfMeasure;
                 let attempts = 0;
-    
+
                 while (unitOfMeasure === undefined && attempts < 1000) {
                     const uomResponse = await safeRequest('get', `https://${global.enviroment}/v0/items/${items[skuCode].itemId}/units-of-measure`);
                     unitOfMeasure = uomResponse.data.data[0];
-                    
+
                     if (unitOfMeasure === undefined) {
                         attempts++;
                         await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 1 second before retry
                     }
                 }
-                
+
                 // Create unit of measure if needed
                 if (!unitOfMeasure) {
-                    const uomPayload = {unitsOfMeasure:[{
-                        "supplierId": supplierId,
-                        "supplierSku": skuCodeCasePreserved,
-                        "cost": {
-                            "amount": !multiplicationExceptions.includes(item['rm type name']) ? parseFloatSafe(item['order price'], 2) * 100 || 0 : (parseFloatSafe(item['order price'], 2) || 0),
-                            "currency": order.currency
-                        },
-                        "currency": order.currency,
-                        "quantityInUnit": !multiplicationExceptions.includes(item['rm type name']) ? 100 : 1
-                    }]};
-                    
+                    const uomPayload = {
+                        unitsOfMeasure: [{
+                            "supplierId": supplierId,
+                            "supplierSku": skuCodeCasePreserved,
+                            "cost": {
+                                "amount": !multiplicationExceptions.includes(item['rm type name']) ? parseFloatSafe(item['order price'], 2) * 100 || 0 : (parseFloatSafe(item['order price'], 2) || 0),
+                                "currency": order.currency
+                            },
+                            "currency": order.currency,
+                            "quantityInUnit": !multiplicationExceptions.includes(item['rm type name']) ? 100 : 1
+                        }]
+                    };
+
                     console.log(`Creating UOM for item: ${skuCode}`);
                     await safeRequest('patch', `https://${global.enviroment}/v0/items/${items[skuCode].itemId}`, uomPayload);
-                    
+
                     // Get the UOM again
                     let unitOfMeasure;
                     let attempts = 0;
-        
+
                     while (unitOfMeasure === undefined && attempts < 1000) {
                         const uomResponse = await safeRequest('get', `https://${global.enviroment}/v0/items/${items[skuCode].itemId}/units-of-measure`);
                         unitOfMeasure = uomResponse.data.data[0];
-                        
+
                         if (unitOfMeasure === undefined) {
                             attempts++;
                             await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 1 second before retry
                         }
                     }
                 }
-                
+
                 // Add item to purchase order with adjusted quantity and price
                 const orderQuantity = parseFloatSafe(item['order quantity'], 2);
                 const receivedQuantity = parseFloatSafe(item['order received quantity'], 2) || 0;
                 const quantityToUse = round(Math.max(orderQuantity, receivedQuantity), 4);
-                
+
                 // Use the order price directly from the CSV and multiply by the appropriate quantity
                 const unitPrice = parseFloatSafe(item['order price'], 6) || 0;
                 const displayPrice = round((unitPrice) * quantityToUse, 2);
                 const price = round((unitPrice * exchangeRateFloat) * quantityToUse, 2);
-                
+
                 // Calculate tax amounts based on the adjusted prices
                 const tax = round((price * taxMod) - price, 2);
                 const displayTax = round((displayPrice * taxMod) - displayPrice, 2);
-                
+
                 // Add item to purchase order
                 purchaseOrder.items.push({
                     "itemId": items[skuCode].itemId,
@@ -655,7 +709,7 @@ async function makeOrders(orderNumberDebug = false) {
                     "price": round(price, 4),
                     "tax": round(tax, 4),
                     "discount": 0,
-                    "displayPrice": round(displayPrice, 4), 
+                    "displayPrice": round(displayPrice, 4),
                     "displayTax": round(displayTax, 4),
                     "displayDiscount": 0,
                     "unitOfMeasureId": unitOfMeasure.unitOfMeasureId,
@@ -672,42 +726,58 @@ async function makeOrders(orderNumberDebug = false) {
                     },
                     "taxRate": 0
                 });
-                if (allTransfers[orderNumber] == undefined){allTransfers[orderNumber] = {source: `${item['supplier name']} - ${item['supplier code']}`, destinations: {}}}
-                if (allTransfers[orderNumber].destinations[item[`warehouse name`]] == undefined){allTransfers[orderNumber].destinations[item[`warehouse name`]] = {}}
-                if (allTransfers[orderNumber].destinations[item[`warehouse name`]][item['delivery date']] == undefined){allTransfers[orderNumber].destinations[item[`warehouse name`]][item['delivery date']] = {}}
+                if (allTransfers[orderNumber] == undefined) {
+                    allTransfers[orderNumber] = {
+                        source: `${item['supplier name']} - ${item['supplier code']}`,
+                        destinations: {}
+                    }
+                }
+                if (allTransfers[orderNumber].destinations[item[`warehouse name`]] == undefined) {
+                    allTransfers[orderNumber].destinations[item[`warehouse name`]] = {}
+                }
+                if (allTransfers[orderNumber].destinations[item[`warehouse name`]][item['delivery date']] == undefined) {
+                    allTransfers[orderNumber].destinations[item[`warehouse name`]][item['delivery date']] = {}
+                }
                 allTransfers[orderNumber].destinations[item[`warehouse name`]][item['delivery date']][items[item['sku code'].toLowerCase().trim()].itemId] = item['order received quantity']
 
             }
-    
-    
+
+
             logWrite.write(JSON.stringify(purchaseOrder) + '\r\n\r\n')
-    
-            // let purchaseOrderId
+
+            let purchaseOrderId
             // if(Object.keys(existsingPOs).includes(orderNumber)){
             //     purchaseOrderId = existsingPOs[orderNumber]
             // } else {
             //     // Create purchase order
             //     const poResponse = await safeRequest('post', `https://${global.enviroment}/v0/purchase-orders`, purchaseOrder);
             //     purchaseOrderId = poResponse.data.data.id;
-                
-                
+
+
             //     await safeRequest('post', `https://${global.enviroment}/v0/purchase-orders/${purchaseOrderId}/approvals`, {"forced":false});
             //     await safeRequest('post', `https://${global.enviroment}/v0/purchase-orders/${purchaseOrderId}/submissions`, {"forced":false});
             // }
 
             // Create purchase order
+
+            
+
             const poResponse = await safeRequest('post', `https://${global.enviroment}/v0/purchase-orders`, purchaseOrder);
             purchaseOrderId = poResponse.data.data.id;
-            
-            
-            await safeRequest('post', `https://${global.enviroment}/v0/purchase-orders/${purchaseOrderId}/approvals`, {"forced":false});
-            await safeRequest('post', `https://${global.enviroment}/v0/purchase-orders/${purchaseOrderId}/submissions`, {"forced":false});
+
+
+            await safeRequest('post', `https://${global.enviroment}/v0/purchase-orders/${purchaseOrderId}/approvals`, {
+                "forced": false
+            });
+            await safeRequest('post', `https://${global.enviroment}/v0/purchase-orders/${purchaseOrderId}/submissions`, {
+                "forced": false
+            });
 
 
 
-            
+
             console.log(`Created purchase order for ${orderNumber}, ID: ${purchaseOrderId}`);
-            
+
             // Add the purchase order ID to each delivery date
             if (order.deliveries) {
                 for (const deliveryDate in order.deliveries) {
@@ -716,31 +786,31 @@ async function makeOrders(orderNumberDebug = false) {
                             purchaseOrderId: purchaseOrderId,
                             items: order.deliveries[deliveryDate]
                         };
-                        
+
                         // Calculate total cost for each item in this delivery
                         const deliveryItems = order.deliveries[deliveryDate].items.map(item => {
                             // Find the corresponding item in the order to get complete cost data
-                            const originalItem = order.items.find(orderItem => 
+                            const originalItem = order.items.find(orderItem =>
                                 orderItem['sku code'].toLowerCase().trim() === item.skuCode
                             );
-                            
+
                             // Get the total ordered quantity for this item in the entire PO
                             const totalPOQuantity = originalItem ? parseFloatSafe(originalItem['order quantity'], 2) || 0 : 0;
-                            
+
                             // Use the unit price directly from the CSV
                             const unitPrice = originalItem ? parseFloatSafe(originalItem['order price'], 6) || 0 : 0;
-                            
+
                             // For this delivery, use actual received quantity
                             const receivedQuantity = round(item.quantity, 2);
-                            
+
                             // Calculate prices based on the received quantity with proper rounding
                             const price = round(unitPrice * receivedQuantity, 2);
                             const tax = round((price * taxMod) - price, 2);
-                            
+
                             // Calculate display prices for this quantity (in order currency)
                             const displayLinePrice = round(price * parseFloat(exchangeRate), 2);
                             const displayLineTax = round((displayLinePrice * taxMod) - displayLinePrice, 2);
-                            
+
                             return {
                                 ...item,
                                 totalPOQuantity,
@@ -755,11 +825,11 @@ async function makeOrders(orderNumberDebug = false) {
                                 itemSku: items[item.skuCode] ? items[item.skuCode].sku : item.skuCode
                             };
                         });
-                        
+
                         // Calculate grand total quantity and cost
                         const totalQuantity = round(deliveryItems.reduce((sum, item) => sum + (item.quantity || 0), 0), 2);
                         const totalDeliveryCost = round(deliveryItems.reduce((sum, item) => sum + (item.price || 0), 0), 2);
-                        
+
                         // Add to global tracker with all needed information
                         allDeliveries.push({
                             date: deliveryDate,
@@ -785,11 +855,11 @@ async function makeOrders(orderNumberDebug = false) {
 async function processDeliveries() {
     // Track remaining quantities for each SKU
     const remainingQuantities = {};
-    
+
     for (const delivery of allDeliveries) {
         try {
             console.log(`Processing delivery for PO ${delivery.purchaseOrderId} on date ${delivery.date}...`);
-            
+
             let receipt = {
                 "locationId": delivery.locationId,
                 "items": [],
@@ -799,49 +869,47 @@ async function processDeliveries() {
                     delivery.purchaseOrderId
                 ]
             };
-    
+
             let invoice = {
                 "invoiceApplicationMethod": 0,
-                "invoices": [
-                    {
-                        "invoiceNumber": null,
-                        "status": "issued",
-                        "currency": delivery.currency,
-                        "exchangeRate": round(delivery.exchangeRate, 4),
-                        "useSystemExchangeRate": false,
-                        "items": []
-                    }
-                ]
+                "invoices": [{
+                    "invoiceNumber": null,
+                    "status": "issued",
+                    "currency": delivery.currency,
+                    "exchangeRate": round(delivery.exchangeRate, 4),
+                    "useSystemExchangeRate": false,
+                    "items": []
+                }]
             };
-    
+
             // Process each item in the delivery
             for (const item of delivery.items) {
                 try {
                     const skuCode = item.skuCode.toLowerCase().trim();
-                    
+
                     // Check if the item exists in our items dictionary
                     if (!items[skuCode] || !items[skuCode].itemId) {
                         console.error(`Item ${skuCode} not found in items dictionary. Skipping.`);
                         continue;
                     }
-                    
+
                     // Initialize remaining quantity for this SKU if it's the first time seeing it
                     if (remainingQuantities[skuCode] === undefined) {
                         // Use max of ordered quantity or received quantity as the expected total
                         remainingQuantities[skuCode] = Math.max(item.totalPOQuantity || 0, item.quantity || 0);
                     }
-                    
+
                     // Use the current remaining quantity as the expected quantity
                     const expectedQuantity = round(remainingQuantities[skuCode], 4);
-                    
+
                     // Reduce the remaining quantity for this SKU
                     remainingQuantities[skuCode] = round(remainingQuantities[skuCode] - (item.quantity || 0), 4);
-                    
+
                     // Ensure we don't go below zero
                     if (remainingQuantities[skuCode] < 0) {
                         remainingQuantities[skuCode] = 0;
                     }
-                    
+
                     receipt.items.push({
                         "itemId": items[skuCode].itemId,
                         "quantityReceived": round(item.quantity || 0, 4),
@@ -852,8 +920,8 @@ async function processDeliveries() {
                             "currency": delivery.currency
                         }
                     });
-        
-                    if (round((item.unitPrice || 0) * (item.quantity || 0), 4) > 0){
+
+                    if (round((item.unitPrice || 0) * (item.quantity || 0), 4) > 0) {
                         invoice.invoices[0].items.push({
                             "referenceType": "item",
                             "referenceId": items[skuCode].itemId,
@@ -870,17 +938,17 @@ async function processDeliveries() {
                     // Continue with next item
                 }
             }
-            
+
             // Only proceed if we have items to process
             if (receipt.items.length === 0) {
                 console.error(`No valid items to receive for delivery on date ${delivery.date}. Skipping.`);
                 continue;
             }
-    
+
             try {
                 logWrite.write(JSON.stringify(receipt) + '\r\n\r\n')
                 logWrite.write(JSON.stringify(invoice) + '\r\n\r\n')
-                
+
                 try {
                     let goodsReceiptId = await safeRequest('post', `https://${global.enviroment}/v0/goods-receipts`, receipt);
                     console.log(`Created goods receipt: ${goodsReceiptId.data.data.id}`);
@@ -890,7 +958,7 @@ async function processDeliveries() {
                     console.error(`Failed to complete goods receipt ${goodsReceiptId.data.data.id}: ${error.message}`);
                     // Continue anyway
                 }
-                
+
                 try {
                     await safeRequest('post', `https://${global.enviroment}/v0/purchase-orders/${delivery.purchaseOrderId}/add-invoices`, invoice);
                     console.log(`Added invoice to PO: ${delivery.purchaseOrderId}`);
@@ -911,11 +979,13 @@ async function processDeliveries() {
     }
 }
 
-async function processTransfers(){
-    for (const transfer of transferArr){
-        if (transfer.items.length == 0){continue}
-        try{
-            await safeRequest('post', `https://${global.enviroment}/v0/stock-transfers`, transfer).then(async r=>{
+async function processTransfers() {
+    for (const transfer of transferArr) {
+        if (transfer.items.length == 0) {
+            continue
+        }
+        try {
+            await safeRequest('post', `https://${global.enviroment}/v0/stock-transfers`, transfer).then(async r => {
                 await safeRequest('post', `https://${global.enviroment}/v0/stock-transfers/${r.data.data.id}/submissions`)
             })
         } catch {}
@@ -926,91 +996,91 @@ async function processTransfers(){
 // Main function
 async function run() {
 
-        await getAllPOs()
+    await getAllPOs()
 
-        try {
-            await getAllSuppliers();
-        } catch (error) {
-            console.error(`Error getting suppliers: ${error.message}`);
-            // Continue anyway, some suppliers might work
-        }
-        
-        try {
-            await getAllItems();
-        } catch (error) {
-            console.error(`Error getting items: ${error.message}`);
-            // Continue anyway, some items might work
-        }
-        
-        try {
-            await getCustomersSheet();
-        } catch (error) {
-            console.error(`Error getting customer sheet: ${error.message}`);
-            // Continue anyway with empty customer data
-        }
-        
-        try {
-            await getOrdersSheet();
-        } catch (error) {
-            console.error(`Error getting orders sheet: ${error.message}`);
-        }
-        
-        await getAllLocations();
-        
-        await makeOrders();
-    
-        // Sort the global deliveries by date (oldest to newest)
-        allDeliveries.sort((a, b) => {
-            // Convert string dates to numbers for comparison
-            const dateA = parseInt(a.date);
-            const dateB = parseInt(b.date);
-            return dateA - dateB;
-        });
+    try {
+        await getAllSuppliers();
+    } catch (error) {
+        console.error(`Error getting suppliers: ${error.message}`);
+        // Continue anyway, some suppliers might work
+    }
+
+    try {
+        await getAllItems();
+    } catch (error) {
+        console.error(`Error getting items: ${error.message}`);
+        // Continue anyway, some items might work
+    }
+
+    try {
+        await getCustomersSheet();
+    } catch (error) {
+        console.error(`Error getting customer sheet: ${error.message}`);
+        // Continue anyway with empty customer data
+    }
+
+    try {
+        await getOrdersSheet();
+    } catch (error) {
+        console.error(`Error getting orders sheet: ${error.message}`);
+    }
+
+    await getAllLocations();
+
+    await makeOrders();
+
+    // Sort the global deliveries by date (oldest to newest)
+    allDeliveries.sort((a, b) => {
+        // Convert string dates to numbers for comparison
+        const dateA = parseInt(a.date);
+        const dateB = parseInt(b.date);
+        return dateA - dateB;
+    });
 
 
-        for (const orderNumber of Object.keys(allTransfers)){
-            for (let destination of Object.keys(allTransfers[orderNumber].destinations)){
-                for (const delivery of Object.keys(allTransfers[orderNumber].destinations[destination])){
-                    let locationId = await getLocation(destination)
-                    let sourceId = await getLocation(allTransfers[orderNumber].source)
-                    let transfer = {
-                        "sourceLocationId": sourceId,
-                        "destinationLocationId": locationId,
-                        "courierRequired": false,
-                        "items": [],
-                        delivery: delivery
+    for (const orderNumber of Object.keys(allTransfers)) {
+        for (let destination of Object.keys(allTransfers[orderNumber].destinations)) {
+            for (const delivery of Object.keys(allTransfers[orderNumber].destinations[destination])) {
+                let locationId = await getLocation(destination)
+                let sourceId = await getLocation(allTransfers[orderNumber].source)
+                let transfer = {
+                    "sourceLocationId": sourceId,
+                    "destinationLocationId": locationId,
+                    "courierRequired": false,
+                    "items": [],
+                    delivery: delivery
+                }
+                for (const item of Object.keys(allTransfers[orderNumber].destinations[destination][delivery])) {
+                    if (allTransfers[orderNumber].destinations[destination][delivery][item] > 0) {
+                        transfer.items.push({
+                            itemId: item,
+                            quantity: allTransfers[orderNumber].destinations[destination][delivery][item]
+                        })
                     }
-                    for (const item of Object.keys(allTransfers[orderNumber].destinations[destination][delivery])){
-                        if (allTransfers[orderNumber].destinations[destination][delivery][item] > 0){
-                            transfer.items.push({
-                                itemId: item,
-                                quantity: allTransfers[orderNumber].destinations[destination][delivery][item]
-                            })
-                        }
-                    }
-                    transferArr.push(transfer)
-                }  
+                }
+                transferArr.push(transfer)
             }
         }
+    }
 
-        transferArr.sort((a, b) => {
-            // Convert the date strings to numbers for comparison
-            const dateA = parseInt(a.delivery, 10);
-            const dateB = parseInt(b.delivery, 10);
-            
-            // Sort from oldest to newest
-            return dateA - dateB;
-            });
-        
-        // Log the global deliveries tracker
-        console.log(`Total delivery events tracked: ${allDeliveries.length}`);
-        
-        await processDeliveries();
+    transferArr.sort((a, b) => {
+        // Convert the date strings to numbers for comparison
+        const dateA = parseInt(a.delivery, 10);
+        const dateB = parseInt(b.delivery, 10);
 
-        await processTransfers()
+        // Sort from oldest to newest
+        return dateA - dateB;
+    });
 
-        
-        console.log('Import completed successfully');
+    // Log the global deliveries tracker
+    console.log(`Total delivery events tracked: ${allDeliveries.length}`);
+
+    await processDeliveries();
+
+    await processTransfers()
+
+
+    console.log('Import completed successfully');
 }
 
 module.exports = {
