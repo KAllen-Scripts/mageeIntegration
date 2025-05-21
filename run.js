@@ -5,9 +5,9 @@ let failedArr = [];
 (async ()=>{
     // await require('./scripts/itemsRedo.js').run()
     // await require('./scripts/UOM.js').run()
-    await require('./scripts/BOMS.js').run()
+    // await require('./scripts/BOMS.js').run()
 
-    // await require('./scripts/POs.js').run()
+    await require('./scripts/POs.js').run()
     // await require('./scripts/manufacturing.js').run()
 
     // await require('./scripts/saleOrders.js').run()

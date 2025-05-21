@@ -10,6 +10,7 @@ let RMCost = '../files - new/cost/header';
 let rawMaterials = {};
 let suppliers = {};
 let costLookup = {};
+let costLookupBackup = {};
 let itemTypes = {};
 let itemList = {};
 
@@ -74,9 +75,15 @@ async function processRMCosts() {
                     if(row['Colour Code'] == ''){
                         key += `-${row['Product/RM Code']}`
                     }
+
+                    if (row['Product/RM Code'] == '65329'){
+                        console.log(row['Product Purchase Price'])
+                        await common.askQuestion()
+                    }
                     
                     if (key && row['Product Purchase Price'] !== undefined) {
                         costLookup[key] = parseFloat(row['Product Purchase Price']);
+                        costLookupBackup[row['Product/RM Code']] = parseFloat(row['Product Purchase Price']);
                     }
 
                     stream.resume();
@@ -166,9 +173,16 @@ async function processRMData() {
                             if (rawMaterials[RM].colorRef == compareString) {
                                 rawMaterials[RM].type = row['RM Type Description'];
 
-                                let amount = (multiplicationExceptions.includes(row['RM Type Description']) ? costLookup[`${row['RM Code']}-${row['RM Colour Code']}`] : costLookup[`${row['RM Code']}-${row['RM Colour Code']}`] * 100) || 0
+                                const fromCostLookup = costLookup[`${row['RM Code']}-${row['RM Colour Code']}`] || costLookupBackup[row['RM Code'].split('-')[0]]
 
-                                if (costLookup[`${row['RM Code']}-${row['RM Colour Code']}`] < 0.001){amount = 0}
+                                let amount = (multiplicationExceptions.includes(row['RM Type Description']) ? fromCostLookup : fromCostLookup * 100) || 0
+
+                                if (fromCostLookup < 0.001){amount = 0}
+
+                                if (RM == '65329-3916-STD'){
+                                    console.log(row['RM Code'].split('-')[0])
+                                    await common.askQuestion()
+                                }
 
                                 rawMaterials[RM].UOM = [
                                     {
@@ -199,7 +213,7 @@ async function processRMData() {
 let dupeList = []
 async function makeRMs(){
     for (const RM of Object.keys(rawMaterials)){
-        // if (RM != '80229-80229-STD'){continue}
+        // if (RM != '65329-3916-STD'){continue}
         try{
             let type = rawMaterials[RM].type
             if (!type || itemTypes?.[type.toLowerCase().trim()] == undefined){
@@ -217,16 +231,16 @@ async function makeRMs(){
                 return itemToCheck
             })();
 
-            // console.log({
-            //     tags: ['RM'],
-            //     "format": 0,
-            //     "name": RM,
-            //     "sku": sku,
-            //     typeId: itemTypes[type.toLowerCase().trim()],
-            //     unitsOfMeasure: rawMaterials[RM].UOM
-            // })
+            console.log({
+                tags: ['RM'],
+                "format": 0,
+                "name": RM,
+                "sku": sku,
+                typeId: itemTypes[type.toLowerCase().trim()],
+                unitsOfMeasure: rawMaterials[RM].UOM
+            })
 
-            // console.log(rawMaterials[RM].UOM)
+            console.log(rawMaterials[RM].UOM)
     
             dupeList.push(altSKUExceptions.includes(type) ? RM : rawMaterials[RM].potentialAltSku)
 

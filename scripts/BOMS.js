@@ -576,7 +576,7 @@ async function makeBoms(){
         for (const fabric of Object.keys(BOMS[BOM])){
             let updateParent = false
             if(itemList[`${BOM}_${fabric}`] == undefined){continue}
-            if (`${BOM}_${fabric}` != 'LI2PC_43512'){continue}
+            // if (`${BOM}_${fabric}` != 'LI2PC_43512'){continue}
             let templateList = []
             let billOfMaterialsTemplate = []
             try{
@@ -628,8 +628,6 @@ async function makeBoms(){
                         }]
                     }
 
-                    console.log(additionalCosts[`${BOM}_${fabric}`])
-                    await common.askQuestion(1)
 
                     if (additionalCosts[`${BOM}_${fabric}`] != undefined){
                         for (const additional of additionalCosts[`${BOM}_${fabric}`]){
@@ -642,13 +640,9 @@ async function makeBoms(){
                                 "rate": 0,
                                 automaticallyIncludeOnManufacturingRuns: false
                             })
-                            console.log(manufacturingCostsChild)
-                            await common.askQuestion(2)
                         }
                     }
 
-                    console.log(manufacturingCostsChild)
-                    await common.askQuestion(3)
 
 
                     let bomList = []
@@ -677,7 +671,6 @@ async function makeBoms(){
                         manufacturingCosts: manufacturingCostsChild
                     })
 
-                    await common.askQuestion()
 
                     let attempts = 0;
                     const maxRetries = 5;
